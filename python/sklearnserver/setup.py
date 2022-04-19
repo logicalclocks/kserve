@@ -28,12 +28,13 @@ setup(
     description='Model Server implementation for scikit-learn. \
                  Not intended for use outside KServe Frameworks Images',
     long_description=open('README.md').read(),
-    python_requires='>3.4',
+    python_requires='>3.7',
     packages=find_packages("sklearnserver"),
     install_requires=[
         "kserve>=0.7.0rc0",
-        "scikit-learn == 0.20.3",
-        "joblib >= 0.13.0"
+        "scikit-learn == 0.22.2.post1",
+        "joblib == 1.1.0",
+        "ray[serve] == 1.6.0"
     ],
     tests_require=tests_require,
     extras_require={'test': tests_require}
