@@ -18,9 +18,9 @@ avro>=1.10.1
 boto3==1.18.18
 botocore==1.21.18
 psutil>=5.0
-ray[serve]==1.5.0
-grpcio==1.38.1
-google_api_core==1.29.0
+ray[serve]==1.6.0
+grpcio~=1.32.0
+# google_api_core==1.29.0 # since this library is not used and it creates conflicts with HW python environment, we omit it.
 jmespath==0.10.0
 googleapis_common_protos==1.53.0
 cachetools==4.2.2
