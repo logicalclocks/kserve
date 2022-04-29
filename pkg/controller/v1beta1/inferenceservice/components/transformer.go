@@ -1,5 +1,4 @@
 /*
-Copyright 2020 kubeflow.org.
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
@@ -15,10 +14,12 @@ package components
 
 import (
 	"github.com/go-logr/logr"
-	"github.com/kubeflow/kfserving/pkg/constants"
-	"github.com/kubeflow/kfserving/pkg/controller/v1beta1/inferenceservice/reconcilers/knative"
-	"github.com/kubeflow/kfserving/pkg/credentials"
-	"github.com/kubeflow/kfserving/pkg/utils"
+	"github.com/kserve/kserve/pkg/constants"
+	"github.com/kserve/kserve/pkg/controller/v1beta1/inferenceservice/reconcilers/knative"
+	raw "github.com/kserve/kserve/pkg/controller/v1beta1/inferenceservice/reconcilers/raw"
+	isvcutils "github.com/kserve/kserve/pkg/controller/v1beta1/inferenceservice/utils"
+	"github.com/kserve/kserve/pkg/credentials"
+	"github.com/kserve/kserve/pkg/utils"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -27,7 +28,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
-	"github.com/kubeflow/kfserving/pkg/apis/serving/v1beta1"
+	"github.com/kserve/kserve/pkg/apis/serving/v1beta1"
 )
 
 var _ Component = &Transformer{}
@@ -90,16 +91,51 @@ func (p *Transformer) Reconcile(isvc *v1beta1.InferenceService) error {
 		addAgentContainerPort(&isvc.Spec.Transformer.PodSpec.Containers[0])
 	}
 	podSpec := corev1.PodSpec(isvc.Spec.Transformer.PodSpec)
-	r := knative.NewKsvcReconciler(p.client, p.scheme, objectMeta, &isvc.Spec.Transformer.ComponentExtensionSpec,
-		&podSpec, isvc.Status.Components[v1beta1.TransformerComponent])
 
-	if err := controllerutil.SetControllerReference(isvc, r.Service, p.scheme); err != nil {
-		return errors.Wrapf(err, "fails to set owner reference for transformer")
-	}
-	status, err := r.Reconcile()
+	deployConfig, err := v1beta1.NewDeployConfig(p.client)
 	if err != nil {
-		return errors.Wrapf(err, "fails to reconcile transformer")
+		return err
 	}
-	isvc.Status.PropagateStatus(v1beta1.TransformerComponent, status)
+	// Here we allow switch between knative and vanilla deployment
+	if isvcutils.GetDeploymentMode(annotations, deployConfig) == constants.RawDeployment {
+		r, err := raw.NewRawKubeReconciler(p.client, p.scheme, objectMeta, &isvc.Spec.Transformer.ComponentExtensionSpec,
+			&podSpec)
+		if err != nil {
+			return errors.Wrapf(err, "fails to create NewRawKubeReconciler for transformer")
+		}
+		//set Deployment Controller
+		if err := controllerutil.SetControllerReference(isvc, r.Deployment.Deployment, p.scheme); err != nil {
+			return errors.Wrapf(err, "fails to set deployment owner reference for transformer")
+		}
+		//set Service Controller
+		if err := controllerutil.SetControllerReference(isvc, r.Service.Service, p.scheme); err != nil {
+			return errors.Wrapf(err, "fails to set service owner reference for transformer")
+		}
+		//set autoscaler Controller
+		if r.Scaler.Autoscaler.AutoscalerClass == constants.AutoscalerClassHPA {
+			if err := controllerutil.SetControllerReference(isvc, r.Scaler.Autoscaler.HPA.HPA, p.scheme); err != nil {
+				return errors.Wrapf(err, "fails to set HPA owner reference for transformer")
+			}
+		}
+
+		deployment, err := r.Reconcile()
+		if err != nil {
+			return errors.Wrapf(err, "fails to reoncile transformer")
+		}
+		isvc.Status.PropagateRawStatus(v1beta1.TransformerComponent, deployment, r.URL)
+
+	} else {
+		r := knative.NewKsvcReconciler(p.client, p.scheme, objectMeta, &isvc.Spec.Transformer.ComponentExtensionSpec,
+			&podSpec, isvc.Status.Components[v1beta1.TransformerComponent])
+		if err := controllerutil.SetControllerReference(isvc, r.Service, p.scheme); err != nil {
+			return errors.Wrapf(err, "fails to set owner reference for predictor")
+		}
+		status, err := r.Reconcile()
+		if err != nil {
+			return errors.Wrapf(err, "fails to reconcile predictor")
+		}
+		isvc.Status.PropagateStatus(v1beta1.TransformerComponent, status)
+	}
+
 	return nil
 }

@@ -1,5 +1,4 @@
 /*
-Copyright 2020 kubeflow.org.
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
@@ -17,14 +16,16 @@ import (
 	"context"
 	"testing"
 
-	kfservingv1alpha1 "github.com/kubeflow/kfserving/pkg/apis/serving/v1alpha1"
-	"github.com/kubeflow/kfserving/pkg/constants"
-	pkgtest "github.com/kubeflow/kfserving/pkg/testing"
+	netv1 "k8s.io/api/networking/v1"
+
+	kfservingv1alpha1 "github.com/kserve/kserve/pkg/apis/serving/v1alpha1"
+	"github.com/kserve/kserve/pkg/constants"
+	pkgtest "github.com/kserve/kserve/pkg/testing"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 
-	"github.com/kubeflow/kfserving/pkg/apis/serving/v1beta1"
+	"github.com/kserve/kserve/pkg/apis/serving/v1beta1"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -67,6 +68,8 @@ var _ = BeforeSuite(func(done Done) {
 	Expect(err).NotTo(HaveOccurred())
 	err = knservingv1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
+	err = netv1.AddToScheme(scheme.Scheme)
+	Expect(err).NotTo(HaveOccurred())
 
 	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})
 	Expect(err).ToNot(HaveOccurred())
@@ -75,7 +78,7 @@ var _ = BeforeSuite(func(done Done) {
 	//Create namespace
 	kfservingNamespaceObj := &v1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: constants.KFServingNamespace,
+			Name: constants.KServeNamespace,
 		},
 	}
 	Expect(k8sClient.Create(context.Background(), kfservingNamespaceObj)).Should(Succeed())
@@ -85,15 +88,18 @@ var _ = BeforeSuite(func(done Done) {
 		MetricsBindAddress: "0",
 	})
 	Expect(err).ToNot(HaveOccurred())
+
+	deployConfig := &v1beta1.DeployConfig{DefaultDeploymentMode: "Serverless"}
 	err = (&InferenceServiceReconciler{
-		Client:   k8sManager.GetClient(),
-		Scheme:   scheme.Scheme,
+		Client:   k8sClient,
+		Scheme:   k8sClient.Scheme(),
 		Log:      ctrl.Log.WithName("V1beta1InferenceServiceController"),
 		Recorder: k8sManager.GetEventRecorderFor("V1beta1InferenceServiceController"),
-	}).SetupWithManager(k8sManager)
+	}).SetupWithManager(k8sManager, deployConfig)
 	Expect(err).ToNot(HaveOccurred())
-	defer GinkgoRecover()
+
 	go func() {
+		defer GinkgoRecover()
 		err = k8sManager.Start(ctrl.SetupSignalHandler())
 		Expect(err).ToNot(HaveOccurred())
 	}()

@@ -1,4 +1,3 @@
-# Copyright 2019 kubeflow.org.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,10 +18,13 @@ import joblib
 import pickle
 import os
 
+import pytest
+
 _MODEL_DIR = os.path.join(os.path.dirname(__file__), "example_models")
 JOBLIB_FILE = [os.path.join(_MODEL_DIR, "joblib", "model"), "model.joblib"]
 PICKLE_FILES = [[os.path.join(_MODEL_DIR, "pkl", "model"), "model.pkl"],
                 [os.path.join(_MODEL_DIR, "pickle", "model"), "model.pickle"]]
+MULTI_DIR = os.path.join(_MODEL_DIR, "multi", "model")
 
 
 def _train_sample_model():
@@ -58,3 +60,17 @@ def test_model_joblib():
 def test_model_pickle():
     for pickle_file in PICKLE_FILES:
         _run_pickle_model(pickle_file[0], pickle_file[1])
+
+
+def test_dir_with_no_model():
+    model = SKLearnModel("model", _MODEL_DIR)
+    with pytest.raises(RuntimeError) as e:
+        model.load()
+    assert 'Missing Model File' in str(e.value)
+
+
+def test_dir_with_two_models():
+    model = SKLearnModel("model", MULTI_DIR)
+    with pytest.raises(RuntimeError) as e:
+        model.load()
+    assert 'More than one model file is detected' in str(e.value)
