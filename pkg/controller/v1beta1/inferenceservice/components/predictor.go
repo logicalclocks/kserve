@@ -1,5 +1,4 @@
 /*
-Copyright 2020 kubeflow.org.
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
@@ -15,11 +14,13 @@ package components
 
 import (
 	"github.com/go-logr/logr"
-	"github.com/kubeflow/kfserving/pkg/constants"
-	"github.com/kubeflow/kfserving/pkg/controller/v1beta1/inferenceservice/reconcilers/knative"
-	modelconfig "github.com/kubeflow/kfserving/pkg/controller/v1beta1/inferenceservice/reconcilers/modelconfig"
-	"github.com/kubeflow/kfserving/pkg/credentials"
-	"github.com/kubeflow/kfserving/pkg/utils"
+	"github.com/kserve/kserve/pkg/constants"
+	"github.com/kserve/kserve/pkg/controller/v1beta1/inferenceservice/reconcilers/knative"
+	modelconfig "github.com/kserve/kserve/pkg/controller/v1beta1/inferenceservice/reconcilers/modelconfig"
+	raw "github.com/kserve/kserve/pkg/controller/v1beta1/inferenceservice/reconcilers/raw"
+	isvcutils "github.com/kserve/kserve/pkg/controller/v1beta1/inferenceservice/utils"
+	"github.com/kserve/kserve/pkg/credentials"
+	"github.com/kserve/kserve/pkg/utils"
 	"github.com/pkg/errors"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -28,7 +29,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
-	"github.com/kubeflow/kfserving/pkg/apis/serving/v1beta1"
+	"github.com/kserve/kserve/pkg/apis/serving/v1beta1"
 )
 
 var _ Component = &Predictor{}
@@ -53,7 +54,6 @@ func NewPredictor(client client.Client, scheme *runtime.Scheme, inferenceService
 
 // Reconcile observes the predictor and attempts to drive the status towards the desired state.
 func (p *Predictor) Reconcile(isvc *v1beta1.InferenceService) error {
-	p.Log.Info("Reconciling Predictor", "PredictorSpec", isvc.Spec.Predictor)
 	predictor := isvc.Spec.Predictor.GetImplementation()
 	annotations := utils.Filter(isvc.Annotations, func(key string) bool {
 		return !utils.Includes(constants.ServiceAnnotationDisallowedList, key)
@@ -86,7 +86,7 @@ func (p *Predictor) Reconcile(isvc *v1beta1.InferenceService) error {
 		isvc.Spec.Predictor.PodSpec.Containers[0] = *container
 	}
 	//TODO now knative supports multi containers, consolidate logger/batcher/puller to the sidecar container
-	//https://github.com/kubeflow/kfserving/issues/973
+	//https://github.com/kserve/kserve/issues/973
 	if hasInferenceLogging || hasInferenceBatcher {
 		addAgentContainerPort(&isvc.Spec.Predictor.PodSpec.Containers[0])
 	}
@@ -99,17 +99,50 @@ func (p *Predictor) Reconcile(isvc *v1beta1.InferenceService) error {
 		return err
 	}
 
-	// Here we allow switch between knative and vanilla deployment
-	r := knative.NewKsvcReconciler(p.client, p.scheme, objectMeta, &isvc.Spec.Predictor.ComponentExtensionSpec,
-		&podSpec, isvc.Status.Components[v1beta1.PredictorComponent])
-
-	if err := controllerutil.SetControllerReference(isvc, r.Service, p.scheme); err != nil {
-		return errors.Wrapf(err, "fails to set owner reference for predictor")
-	}
-	status, err := r.Reconcile()
+	deployConfig, err := v1beta1.NewDeployConfig(p.client)
 	if err != nil {
-		return errors.Wrapf(err, "fails to reconcile predictor")
+		return err
 	}
-	isvc.Status.PropagateStatus(v1beta1.PredictorComponent, status)
+
+	// Here we allow switch between knative and vanilla deployment
+	if isvcutils.GetDeploymentMode(annotations, deployConfig) == constants.RawDeployment {
+		r, err := raw.NewRawKubeReconciler(p.client, p.scheme, objectMeta, &isvc.Spec.Predictor.ComponentExtensionSpec,
+			&podSpec)
+		if err != nil {
+			return errors.Wrapf(err, "fails to create NewRawKubeReconciler for predictor")
+		}
+		//set Deployment Controller
+		if err := controllerutil.SetControllerReference(isvc, r.Deployment.Deployment, p.scheme); err != nil {
+			return errors.Wrapf(err, "fails to set deployment owner reference for predictor")
+		}
+		//set Service Controller
+		if err := controllerutil.SetControllerReference(isvc, r.Service.Service, p.scheme); err != nil {
+			return errors.Wrapf(err, "fails to set service owner reference for predictor")
+		}
+		//set autoscaler Controller
+		if r.Scaler.Autoscaler.AutoscalerClass == constants.AutoscalerClassHPA {
+			if err := controllerutil.SetControllerReference(isvc, r.Scaler.Autoscaler.HPA.HPA, p.scheme); err != nil {
+				return errors.Wrapf(err, "fails to set HPA owner reference for predictor")
+			}
+		}
+
+		deployment, err := r.Reconcile()
+		if err != nil {
+			return errors.Wrapf(err, "fails to reconcile predictor")
+		}
+		isvc.Status.PropagateRawStatus(v1beta1.PredictorComponent, deployment, r.URL)
+	} else {
+		r := knative.NewKsvcReconciler(p.client, p.scheme, objectMeta, &isvc.Spec.Predictor.ComponentExtensionSpec,
+			&podSpec, isvc.Status.Components[v1beta1.PredictorComponent])
+		if err := controllerutil.SetControllerReference(isvc, r.Service, p.scheme); err != nil {
+			return errors.Wrapf(err, "fails to set owner reference for predictor")
+		}
+		status, err := r.Reconcile()
+		if err != nil {
+			return errors.Wrapf(err, "fails to reconcile predictor")
+		}
+		isvc.Status.PropagateStatus(v1beta1.PredictorComponent, status)
+	}
+
 	return nil
 }
