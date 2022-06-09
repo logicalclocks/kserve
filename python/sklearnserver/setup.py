@@ -34,7 +34,8 @@ setup(
         "kserve>=0.7.0rc0",
         "scikit-learn == 0.22.2.post1",
         "joblib == 1.1.0",
-        "ray[serve] == 1.6.0"
+        "ray[serve] == 1.6.0",
+        "protobuf ~= 3.20.1"
     ],
     tests_require=tests_require,
     extras_require={'test': tests_require}
