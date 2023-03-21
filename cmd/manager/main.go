@@ -22,6 +22,7 @@ import (
 	"github.com/kserve/kserve/pkg/apis/serving/v1alpha1"
 	"github.com/kserve/kserve/pkg/apis/serving/v1beta1"
 	"github.com/kserve/kserve/pkg/constants"
+	graphcontroller "github.com/kserve/kserve/pkg/controller/v1alpha1/inferencegraph"
 	trainedmodelcontroller "github.com/kserve/kserve/pkg/controller/v1alpha1/trainedmodel"
 	"github.com/kserve/kserve/pkg/controller/v1alpha1/trainedmodel/reconcilers/modelconfig"
 	v1beta1controller "github.com/kserve/kserve/pkg/controller/v1beta1/inferenceservice"
@@ -36,7 +37,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	knservingv1 "knative.dev/serving/pkg/apis/serving/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
-	client "sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
@@ -50,6 +51,38 @@ var (
 	setupLog = ctrl.Log.WithName("setup")
 )
 
+const (
+	LeaderLockName = "kserve-controller-manager-leader-lock"
+)
+
+// Options defines the program configurable options that may be passed on the command line.
+type Options struct {
+	metricsAddr          string
+	webhookPort          int
+	enableLeaderElection bool
+}
+
+// DefaultOptions returns the default values for the program options.
+func DefaultOptions() Options {
+	return Options{
+		metricsAddr:          ":8080",
+		webhookPort:          9443,
+		enableLeaderElection: false,
+	}
+}
+
+// GetOptions parses the program flags and returns them as Options.
+func GetOptions() Options {
+	opts := DefaultOptions()
+	flag.StringVar(&opts.metricsAddr, "metrics-addr", opts.metricsAddr, "The address the metric endpoint binds to.")
+	flag.IntVar(&opts.webhookPort, "webhook-port", opts.webhookPort, "The port that the webhook server binds to.")
+	flag.BoolVar(&opts.enableLeaderElection, "leader-elect", opts.enableLeaderElection,
+		"Enable leader election for kserve controller manager. "+
+			"Enabling this will ensure there is only one active kserve controller manager.")
+	flag.Parse()
+	return opts
+}
+
 func init() {
 	// Allow unknown fields in Istio API client for backwards compatibility if cluster has existing vs with deprecated fields.
 	istio_networking.VirtualServiceUnmarshaler.AllowUnknownFields = true
@@ -57,9 +90,6 @@ func init() {
 }
 
 func main() {
-	var metricsAddr string
-	flag.StringVar(&metricsAddr, "metrics-addr", ":8080", "The address the metric endpoint binds to.")
-	flag.Parse()
 	logf.SetLogger(zap.New())
 	log := logf.Log.WithName("entrypoint")
 
@@ -73,7 +103,13 @@ func main() {
 
 	// Create a new Cmd to provide shared dependencies and start components
 	log.Info("Setting up manager")
-	mgr, err := manager.New(cfg, manager.Options{MetricsBindAddress: metricsAddr, Port: 9443})
+	options := GetOptions()
+	mgr, err := manager.New(cfg, manager.Options{
+		MetricsBindAddress: options.metricsAddr,
+		Port:               options.webhookPort,
+		LeaderElection:     options.enableLeaderElection,
+		LeaderElectionID:   LeaderLockName,
+	})
 	if err != nil {
 		log.Error(err, "unable to set up overall controller manager")
 		os.Exit(1)
@@ -103,17 +139,23 @@ func main() {
 		log.Error(err, "unable to get deploy config.")
 		os.Exit(1)
 	}
+	ingressConfig, err := v1beta1.NewIngressConfig(client)
+	if err != nil {
+		log.Error(err, "unable to get ingress config.")
+		os.Exit(1)
+	}
 	if deployConfig.DefaultDeploymentMode == string(constants.Serverless) {
 		log.Info("Setting up Knative scheme")
 		if err := knservingv1.AddToScheme(mgr.GetScheme()); err != nil {
 			log.Error(err, "unable to add Knative APIs to scheme")
 			os.Exit(1)
 		}
-
-		log.Info("Setting up Istio schemes")
-		if err := v1alpha3.AddToScheme(mgr.GetScheme()); err != nil {
-			log.Error(err, "unable to add Istio v1alpha3 APIs to scheme")
-			os.Exit(1)
+		if ingressConfig.DisableIstioVirtualHost == false {
+			log.Info("Setting up Istio schemes")
+			if err := v1alpha3.AddToScheme(mgr.GetScheme()); err != nil {
+				log.Error(err, "unable to add Istio v1alpha3 APIs to scheme")
+				os.Exit(1)
+			}
 		}
 	}
 
@@ -138,7 +180,7 @@ func main() {
 		Scheme: mgr.GetScheme(),
 		Recorder: eventBroadcaster.NewRecorder(
 			mgr.GetScheme(), v1.EventSource{Component: "v1beta1Controllers"}),
-	}).SetupWithManager(mgr, deployConfig); err != nil {
+	}).SetupWithManager(mgr, deployConfig, ingressConfig); err != nil {
 		setupLog.Error(err, "unable to create controller", "v1beta1Controller", "InferenceService")
 		os.Exit(1)
 	}
@@ -158,6 +200,20 @@ func main() {
 		os.Exit(1)
 	}
 
+	//Setup Inference graph controller
+	inferenceGraphEventBroadcaster := record.NewBroadcaster()
+	setupLog.Info("Setting up InferenceGraph controller")
+	inferenceGraphEventBroadcaster.StartRecordingToSink(&typedcorev1.EventSinkImpl{Interface: clientSet.CoreV1().Events("")})
+	if err = (&graphcontroller.InferenceGraphReconciler{
+		Client:   mgr.GetClient(),
+		Log:      ctrl.Log.WithName("v1alpha1Controllers").WithName("InferenceGraph"),
+		Scheme:   mgr.GetScheme(),
+		Recorder: eventBroadcaster.NewRecorder(mgr.GetScheme(), v1.EventSource{Component: "InferenceGraphController"}),
+	}).SetupWithManager(mgr, deployConfig); err != nil {
+		setupLog.Error(err, "unable to create controller", "v1alpha1Controllers", "InferenceGraph")
+		os.Exit(1)
+	}
+
 	log.Info("setting up webhook server")
 	hookServer := mgr.GetWebhookServer()
 
@@ -170,6 +226,14 @@ func main() {
 		setupLog.Error(err, "unable to create webhook", "webhook", "v1alpha1")
 		os.Exit(1)
 	}
+
+	if err = ctrl.NewWebhookManagedBy(mgr).
+		For(&v1alpha1.InferenceGraph{}).
+		Complete(); err != nil {
+		setupLog.Error(err, "unable to create webhook", "webhook", "v1alpha1")
+		os.Exit(1)
+	}
+
 	if err = ctrl.NewWebhookManagedBy(mgr).
 		For(&v1beta1.InferenceService{}).
 		Complete(); err != nil {

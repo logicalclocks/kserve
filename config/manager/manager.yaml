@@ -1,5 +1,5 @@
 apiVersion: apps/v1
-kind: StatefulSet
+kind: Deployment
 metadata:
   name: kserve-controller-manager
   namespace: kserve
@@ -11,19 +11,25 @@ spec:
     matchLabels:
       control-plane: kserve-controller-manager
       controller-tools.k8s.io: "1.0"
-  serviceName: controller-manager-service
   template:
     metadata:
       labels:
         control-plane: kserve-controller-manager
         controller-tools.k8s.io: "1.0"
+      annotations:
+        kubectl.kubernetes.io/default-container: manager
     spec:
+      serviceAccountName: kserve-controller-manager
+      securityContext:
+        runAsNonRoot: true
       containers:
       - command:
         - /manager
         image: ko://github.com/kserve/kserve/cmd/manager
         imagePullPolicy: Always
         name: manager
+        securityContext:
+          allowPrivilegeEscalation: false
         env:
           - name: POD_NAMESPACE
             valueFrom:

@@ -1,4 +1,5 @@
 /*
+Copyright 2021 The KServe Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -25,6 +26,7 @@ import (
 	"github.com/kserve/kserve/pkg/constants"
 	"github.com/kserve/kserve/pkg/utils"
 	"k8s.io/apimachinery/pkg/runtime"
+	"knative.dev/serving/pkg/apis/autoscaling"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 )
@@ -48,6 +50,8 @@ var _ webhook.Validator = &InferenceService{}
 func (isvc *InferenceService) ValidateCreate() error {
 	validatorLogger.Info("validate create", "name", isvc.Name)
 
+	annotations := isvc.Annotations
+
 	if err := validateInferenceServiceName(isvc); err != nil {
 		return err
 	}
@@ -59,6 +63,7 @@ func (isvc *InferenceService) ValidateCreate() error {
 	if err := validateAutoscalerTargetUtilizationPercentage(isvc); err != nil {
 		return err
 	}
+
 	for _, component := range []Component{
 		&isvc.Spec.Predictor,
 		isvc.Spec.Transformer,
@@ -71,12 +76,25 @@ func (isvc *InferenceService) ValidateCreate() error {
 			if err := utils.FirstNonNilError([]error{
 				component.GetImplementation().Validate(),
 				component.GetExtensions().Validate(),
+				validateAutoScalingCompExtension(annotations, component.GetExtensions()),
 			}); err != nil {
 				return err
 			}
 		}
 	}
 	return nil
+}
+
+// Validate scaling options component extensions
+func validateAutoScalingCompExtension(annotations map[string]string, compExtSpec *ComponentExtensionSpec) error {
+	deploymentMode := annotations["serving.kserve.io/deploymentMode"]
+	annotationClass := annotations[autoscaling.ClassAnnotationKey]
+	if deploymentMode == string(constants.RawDeployment) || annotationClass == string(autoscaling.HPA) {
+		return validateScalingHPACompExtension(compExtSpec)
+	}
+
+	return validateScalingKPACompExtension(compExtSpec)
+
 }
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
@@ -106,7 +124,7 @@ func validateInferenceServiceName(isvc *InferenceService) error {
 	return nil
 }
 
-//Validation of isvc autoscaler class
+// Validation of isvc autoscaler class
 func validateInferenceServiceAutoscaler(isvc *InferenceService) error {
 	annotations := isvc.ObjectMeta.Annotations
 	value, ok := annotations[constants.AutoscalerClass]
@@ -117,7 +135,7 @@ func validateInferenceServiceAutoscaler(isvc *InferenceService) error {
 				switch class {
 				case constants.AutoscalerClassHPA:
 					if metric, ok := annotations[constants.AutoscalerMetrics]; ok {
-						return validateHPAMetrics(metric)
+						return validateHPAMetrics(ScaleMetric(metric))
 					} else {
 						return nil
 					}
@@ -132,8 +150,8 @@ func validateInferenceServiceAutoscaler(isvc *InferenceService) error {
 	return nil
 }
 
-//Validate of autoscaler HPA metrics
-func validateHPAMetrics(metric string) error {
+// Validate of autoscaler HPA metrics
+func validateHPAMetrics(metric ScaleMetric) error {
 	for _, item := range constants.AutoscalerAllowedMetricsList {
 		if item == constants.AutoscalerMetricsType(metric) {
 			return nil
@@ -143,7 +161,7 @@ func validateHPAMetrics(metric string) error {
 
 }
 
-//Validate of autoscaler targetUtilizationPercentage
+// Validate of autoscaler targetUtilizationPercentage
 func validateAutoscalerTargetUtilizationPercentage(isvc *InferenceService) error {
 	annotations := isvc.ObjectMeta.Annotations
 	if value, ok := annotations[constants.TargetUtilizationPercentage]; ok {
@@ -156,5 +174,67 @@ func validateAutoscalerTargetUtilizationPercentage(isvc *InferenceService) error
 			}
 		}
 	}
+
+	return nil
+}
+
+func validateScalingHPACompExtension(compExtSpec *ComponentExtensionSpec) error {
+	metric := MetricCPU
+	if compExtSpec.ScaleMetric != nil {
+		metric = *compExtSpec.ScaleMetric
+	}
+
+	err := validateHPAMetrics(metric)
+
+	if err != nil {
+		return err
+	}
+
+	if compExtSpec.ScaleTarget != nil {
+		target := *compExtSpec.ScaleTarget
+		if metric == MetricCPU && target < 1 || target > 100 {
+			return fmt.Errorf("The target utilization percentage should be a [1-100] integer.")
+		}
+
+		if metric == MetricMemory && target < 1 {
+			return fmt.Errorf("The target memory should be greater than 1 MiB")
+		}
+
+	}
+
+	return nil
+}
+
+func validateKPAMetrics(metric ScaleMetric) error {
+	for _, item := range constants.AutoScalerKPAMetricsAllowedList {
+		if item == constants.AutoScalerKPAMetricsType(metric) {
+			return nil
+		}
+	}
+	return fmt.Errorf("[%s] is not a supported metric.\n", metric)
+
+}
+
+func validateScalingKPACompExtension(compExtSpec *ComponentExtensionSpec) error {
+	metric := MetricConcurrency
+	if compExtSpec.ScaleMetric != nil {
+		metric = *compExtSpec.ScaleMetric
+	}
+
+	err := validateKPAMetrics(metric)
+
+	if err != nil {
+		return err
+	}
+
+	if compExtSpec.ScaleTarget != nil {
+		target := *compExtSpec.ScaleTarget
+
+		if metric == MetricRPS && target < 1 {
+			return fmt.Errorf("The target for rps should be greater than 1")
+		}
+
+	}
+
 	return nil
 }

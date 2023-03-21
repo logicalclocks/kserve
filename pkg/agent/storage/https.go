@@ -1,4 +1,5 @@
 /*
+Copyright 2021 The KServe Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -23,7 +24,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"os"
@@ -142,7 +142,7 @@ func createNewFile(fileFullName string) (*os.File, error) {
 }
 
 func extractZipFiles(reader io.Reader, dest string) error {
-	body, err := ioutil.ReadAll(reader)
+	body, err := io.ReadAll(reader)
 	if err != nil {
 		return err
 	}
@@ -157,6 +157,15 @@ func extractZipFiles(reader io.Reader, dest string) error {
 		fileFullPath := filepath.Join(dest, zipFile.Name)
 		if !strings.HasPrefix(fileFullPath, filepath.Clean(dest)+string(os.PathSeparator)) {
 			return fmt.Errorf("%s: illegal file path", fileFullPath)
+		}
+
+		if zipFile.Mode().IsDir() {
+			err = os.MkdirAll(fileFullPath, 0755)
+			if err != nil {
+				return fmt.Errorf("unable to create new directory %s", fileFullPath)
+			}
+
+			continue
 		}
 
 		file, err := createNewFile(fileFullPath)
@@ -198,6 +207,15 @@ func extractTarFiles(reader io.Reader, dest string) error {
 		}
 
 		fileFullPath := filepath.Join(dest, header.Name)
+		if header.Typeflag == tar.TypeDir {
+			err = os.MkdirAll(fileFullPath, 0755)
+			if err != nil {
+				return fmt.Errorf("unable to create new directory %s", fileFullPath)
+			}
+
+			continue
+		}
+
 		newFile, err := createNewFile(fileFullPath)
 		if err != nil {
 			return err

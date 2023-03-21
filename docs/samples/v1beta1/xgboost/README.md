@@ -41,7 +41,7 @@ xgb_model.save_model(model_file)
 Once we've got our `model.bst` model serialised, we can then use
 [MLServer](https://github.com/SeldonIO/MLServer) to spin up a local server.
 For more details on MLServer, feel free to check the [XGBoost example in their
-docs](https://github.com/SeldonIO/MLServer/tree/master/examples/xgboost).
+docs](https://github.com/SeldonIO/MLServer/tree/master/docs/examples/xgboost).
 
 > Note that this step is optional and just meant for testing.
 > Feel free to jump straight to [deploying your trained model](#deployment).
@@ -75,13 +75,13 @@ These can be specified through environment variables or by creating a local
 }
 ```
 
-Note that, when we [deploy our model](#deployment), **KFServing will already
+Note that, when we [deploy our model](#deployment), **KServe will already
 inject some sensible defaults** so that it runs out-of-the-box without any
 further configuration.
 However, you can still override these defaults by providing a
 `model-settings.json` file similar to your local one.
 You can even provide a [set of `model-settings.json` files to load multiple
-models](https://github.com/SeldonIO/MLServer/tree/master/examples/mms).
+models](https://github.com/SeldonIO/MLServer/tree/master/docs/examples/mms).
 
 ### Serving our model locally
 
@@ -94,7 +94,7 @@ mlserver start .
 
 ## Deployment
 
-Lastly, we will use KFServing to deploy our trained model.
+Lastly, we will use KServe to deploy our trained model.
 For this, we will just need to use **version `v1beta1`** of the
 `InferenceService` CRD and set the the **`protocolVersion` field to `v2`**.
 
@@ -107,19 +107,19 @@ spec:
   predictor:
     xgboost:
       protocolVersion: "v2"
-      storageUri: "gs://kfserving-samples/models/xgboost/iris"
+      storageUri: "gs://kfserving-examples/models/xgboost/iris"
 ```
 
 Note that this makes the following assumptions:
 
 - Your model weights (i.e. your `model.bst` file) have already been uploaded
   to a "model repository" (GCS in this example) and can be accessed as
-  `gs://kfserving-samples/models/xgboost/iris`.
+  `gs://kfserving-examples/models/xgboost/iris`.
 - There is a K8s cluster available, accessible through `kubectl`.
-- KFServing has already been [installed in your
-  cluster](https://github.com/kubeflow/kfserving/#install-kfserving).
+- KServe has already been [installed in your
+  cluster](https://github.com/kserve/kserve#installation).
 
-Assuming that we've got a cluster accessible through `kubectl` with KFServing
+Assuming that we've got a cluster accessible through `kubectl` with KServe
 already installed, we can deploy our model as:
 
 ```

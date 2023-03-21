@@ -39,21 +39,23 @@ the server will choose a version based on its own policies).
 
 **Health:**
 
- GET v2/health/live
- GET v2/health/ready
- GET v2/models/${MODEL_NAME}[/versions/${MODEL_VERSION}]/ready
+ GET `v2/health/live`
+
+ GET `v2/health/ready`
+
+ GET `v2/models/${MODEL_NAME}[/versions/${MODEL_VERSION}]/ready`
 
 **Server Metadata:**
 
- GET v2
+ GET `v2`
 
 **Model Metadata:**
 
- GET v2/models/${MODEL_NAME}[/versions/${MODEL_VERSION}]
+ GET `v2/models/${MODEL_NAME}[/versions/${MODEL_VERSION}]`
 
 **Inference:**
 
- POST v2/models/${MODEL_NAME}[/versions/${MODEL_VERSION}]/infer
+ POST `v2/models/${MODEL_NAME}[/versions/${MODEL_VERSION}]/infer`
 
 ### Health
 
@@ -421,9 +423,9 @@ Tensor data given explicitly is provided in a JSON array. Each element
 of the array may be an integer, floating-point number, string or
 boolean value. The server can decide to coerce each element to the
 required type or return an error if an unexpected value is
-received. Note that fp16 is problematic to communicate explicitly
-since there is not a standard fp16 representation across backends nor
-typically the programmatic support to create the fp16 representation
+received. Note that fp16 and bf16 are problematic to communicate explicitly
+since there is not a standard fp16/bf16 representation across backends nor
+typically the programmatic support to create the fp16/bf16 representation
 for a JSON number.
 
 For example, the 2-dimensional matrix:
@@ -667,9 +669,8 @@ failure. The request and response messages for ModelInfer are:
       // what is expected by the tensor's shape and data type. The raw
       // data must be the flattened, one-dimensional, row-major order of
       // the tensor elements without any stride or padding between the
-      // elements. Note that the FP16 data type must be represented as raw
-      // content as there is no specific data type for a 16-bit float
-      // type.
+      // elements. Note that the FP16 and BF16 data types must be represented as
+      // raw content as there is no specific data type for a 16-bit float type.
       //
       // If this field is specified then InferInputTensor::contents must
       // not be specified for any input tensor.
@@ -722,9 +723,8 @@ failure. The request and response messages for ModelInfer are:
       // what is expected by the tensor's shape and data type. The raw
       // data must be the flattened, one-dimensional, row-major order of
       // the tensor elements without any stride or padding between the
-      // elements. Note that the FP16 data type must be represented as raw
-      // content as there is no specific data type for a 16-bit float
-      // type.
+      // elements. Note that the FP16 and BF16 data types must be represented as
+      // raw content as there is no specific data type for a 16-bit float type.
       //
       // If this field is specified then InferOutputTensor::contents must
       // not be specified for any output tensor.
@@ -833,7 +833,7 @@ matches the tensor's data type.
 
 A platform is a string indicating a DL/ML framework or
 backend. Platform is returned as part of the response to a
-[Model Metadata](#model_metadata) request but is information only. The
+[Model Metadata](#model-metadata) request but is information only. The
 proposed inference APIs are generic relative to the DL/ML framework
 used by a model and so a client does not need to know the platform of
 a given model to use the API. Platform names use the format
@@ -868,3 +868,4 @@ of each type, in bytes.
 | FP32      | 4            |
 | FP64      | 8            |
 | BYTES     | Variable (max 2<sup>32</sup>) |
+| BF16      | 2            |

@@ -35,7 +35,7 @@ $inferenceservice.serving.kserve.io/torchserve-custom created
 
 ## Run a prediction
 
-The first step is to [determine the ingress IP and ports](../../../../../../README.md#determine-the-ingress-ip-and-ports) and set `INGRESS_HOST` and `INGRESS_PORT`
+The first step is to [determine the ingress IP and ports](https://kserve.github.io/website/master/get_started/first_isvc/#4-determine-the-ingress-ip-and-ports) and set `INGRESS_HOST` and `INGRESS_PORT`
 
 ### Steps
 
@@ -50,7 +50,7 @@ SERVICE_HOSTNAME=$(kubectl get inferenceservice ${MODEL_NAME} <namespace> -o jso
 
 ./hey -m POST -z 30s -T "application/octet-stream" -d "$(cat Huggingface_Transformers/Seq_classification_artifacts/sample_text.txt)" -host ${SERVICE_HOSTNAME} http://${INGRESS_HOST}:${INGRESS_PORT}/predictions/BERTSeqClassification
 
-### Sample load testing on iamge classifier
+### Sample load testing on image classifier
 
 ./hey -m POST -z 30s -T "image/*" -D image_classifier/mnist/test_data -host ${SERVICE_HOSTNAME} http://${INGRESS_HOST}:${INGRESS_PORT}/predictions/mnist
 ```
@@ -58,7 +58,7 @@ SERVICE_HOSTNAME=$(kubectl get inferenceservice ${MODEL_NAME} <namespace> -o jso
 ### Get Pods
 
 ```bash
-Kubectl get pods -n kfserving-test
+Kubectl get pods -n kserve-test
 
 NAME                                                             READY   STATUS        RESTARTS   AGE
 torchserve-custom-cj2d8-deployment-69444c9c74-rq8jq   2/2     Running       0          50m

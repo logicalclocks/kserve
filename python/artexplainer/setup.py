@@ -1,3 +1,4 @@
+# Copyright 2021 The KServe Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -10,8 +11,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import pathlib
 
 from setuptools import setup, find_packages
+
+with open(pathlib.Path(__file__).parent.parent / 'VERSION') as version_file:
+    version = version_file.read().strip()
 
 tests_require = [
     'pytest',
@@ -20,20 +25,21 @@ tests_require = [
 ]
 setup(
     name='artserver',
-    version='0.7.0rc0',
+    version=version,
     author_email='Andrew.Butler@ibm.com',
     license='https://github.com/kserve/kserve/LICENSE',
     url='https://github.com/kserve/kserve/python/artserver',
     description='Model Server implementation for AI Robustness Toolbox. \
                  Not intended for use outside KServe Frameworks Images',
-    python_requires='>3.7',
+    python_requires='>=3.9',
     packages=find_packages("artserver"),
     install_requires=[
-        "kserve>=0.7.0rc0",
+        "kserve>=0.7.0",
         "argparse >= 1.4.0",
         "numpy >= 1.8.2",
-        "adversarial-robustness-toolbox[keras] == 1.4.1",
-        "nest_asyncio>=1.4.0"
+        "adversarial-robustness-toolbox[keras] == 1.10.3",
+        "nest_asyncio>=1.4.0",
+        "pillow>=6.0.0"
     ],
     tests_require=tests_require,
     extras_require={'test': tests_require}

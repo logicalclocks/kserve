@@ -1,8 +1,12 @@
 /*
+Copyright 2021 The KServe Authors.
+
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
-	http://www.apache.org/licenses/LICENSE-2.0
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -37,11 +41,12 @@ const (
 )
 
 type StorageInitializerConfig struct {
-	Image         string `json:"image"`
-	CpuRequest    string `json:"cpuRequest"`
-	CpuLimit      string `json:"cpuLimit"`
-	MemoryRequest string `json:"memoryRequest"`
-	MemoryLimit   string `json:"memoryLimit"`
+	Image                 string `json:"image"`
+	CpuRequest            string `json:"cpuRequest"`
+	CpuLimit              string `json:"cpuLimit"`
+	MemoryRequest         string `json:"memoryRequest"`
+	MemoryLimit           string `json:"memoryLimit"`
+	StorageSpecSecretName string `json:"storageSpecSecretName"`
 }
 
 type StorageInitializerInjector struct {
@@ -88,7 +93,7 @@ func (mi *StorageInitializerInjector) InjectStorageInitializer(pod *v1.Pod) erro
 		return nil
 	}
 
-	// Don't inject if InitContianer already injected
+	// Don't inject if InitContainer already injected
 	for _, container := range pod.Spec.InitContainers {
 		if strings.Compare(container.Name, StorageInitializerContainerName) == 0 {
 			return nil
@@ -209,13 +214,39 @@ func (mi *StorageInitializerInjector) InjectStorageInitializer(pod *v1.Pod) erro
 	pod.Spec.Volumes = append(pod.Spec.Volumes, podVolumes...)
 
 	// Inject credentials
-	if err := mi.credentialBuilder.CreateSecretVolumeAndEnv(
-		pod.Namespace,
-		pod.Spec.ServiceAccountName,
-		initContainer,
-		&pod.Spec.Volumes,
-	); err != nil {
-		return err
+	hasStorageSpec := pod.ObjectMeta.Annotations[constants.StorageSpecAnnotationKey]
+	storageKey := pod.ObjectMeta.Annotations[constants.StorageSpecKeyAnnotationKey]
+	// Inject Storage Spec credentials if exist
+	if hasStorageSpec == "true" {
+		storageSpecSecret := mi.config.StorageSpecSecretName
+		var overrideParams map[string]string
+		if storageSpecParam, ok := pod.ObjectMeta.Annotations[constants.StorageSpecParamAnnotationKey]; ok {
+			if err := json.Unmarshal([]byte(storageSpecParam), &overrideParams); err != nil {
+				return err
+			}
+		}
+		if storageSpecSecret == "" {
+			storageSpecSecret = constants.DefaultStorageSpecSecret
+		}
+		if err := mi.credentialBuilder.CreateStorageSpecSecretEnvs(
+			pod.Namespace,
+			storageKey,
+			storageSpecSecret,
+			overrideParams,
+			initContainer,
+		); err != nil {
+			return err
+		}
+	} else {
+		// Inject service account credentials if storage spec doesn't exist
+		if err := mi.credentialBuilder.CreateSecretVolumeAndEnv(
+			pod.Namespace,
+			pod.Spec.ServiceAccountName,
+			initContainer,
+			&pod.Spec.Volumes,
+		); err != nil {
+			return err
+		}
 	}
 
 	// Add init container to the spec

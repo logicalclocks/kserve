@@ -1,8 +1,12 @@
 /*
+Copyright 2021 The KServe Authors.
+
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
+
     http://www.apache.org/licenses/LICENSE-2.0
+
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -31,7 +35,7 @@ import (
 
 var log = logf.Log.WithName("ServiceReconciler")
 
-//ServiceReconciler is the struct of Raw K8S Object
+// ServiceReconciler is the struct of Raw K8S Object
 type ServiceReconciler struct {
 	client       client.Client
 	scheme       *runtime.Scheme
@@ -54,42 +58,65 @@ func NewServiceReconciler(client client.Client,
 
 func createService(componentMeta metav1.ObjectMeta, componentExt *v1beta1.ComponentExtensionSpec,
 	podSpec *corev1.PodSpec) *corev1.Service {
-	var port int
-	if podSpec.Containers != nil && podSpec.Containers[0].Ports != nil {
-		port = int(podSpec.Containers[0].Ports[0].ContainerPort)
-	} else {
-		port, _ = strconv.Atoi(constants.InferenceServiceDefaultHttpPort)
+	var servicePorts []corev1.ServicePort
+	if len(podSpec.Containers) != 0 {
+		if len(podSpec.Containers[0].Ports) > 0 {
+			for _, port := range podSpec.Containers[0].Ports {
+				var servicePort corev1.ServicePort
+
+				if port.Protocol == "" {
+					port.Protocol = corev1.ProtocolTCP
+				}
+				servicePort = corev1.ServicePort{
+					Name: port.Name,
+					Port: port.ContainerPort,
+					TargetPort: intstr.IntOrString{
+						Type:   intstr.Int,
+						IntVal: port.ContainerPort,
+					},
+					Protocol: port.Protocol,
+				}
+				servicePorts = append(servicePorts, servicePort)
+			}
+		} else {
+			port, _ := strconv.Atoi(constants.InferenceServiceDefaultHttpPort)
+			servicePorts = append(servicePorts, corev1.ServicePort{
+				Name: componentMeta.Name,
+				Port: constants.CommonDefaultHttpPort,
+				TargetPort: intstr.IntOrString{
+					Type:   intstr.Int,
+					IntVal: int32(port),
+				},
+				Protocol: corev1.ProtocolTCP,
+			})
+		}
 	}
+	if componentExt.Batcher != nil {
+		servicePorts[0].TargetPort = intstr.IntOrString{
+			Type:   intstr.Int,
+			IntVal: constants.InferenceServiceDefaultAgentPort,
+		}
+	}
+	if componentExt.Logger != nil {
+		servicePorts[0].TargetPort = intstr.IntOrString{
+			Type:   intstr.Int,
+			IntVal: constants.InferenceServiceDefaultAgentPort,
+		}
+	}
+
 	service := &corev1.Service{
 		ObjectMeta: componentMeta,
 		Spec: corev1.ServiceSpec{
 			Selector: map[string]string{
 				"app": constants.GetRawServiceLabel(componentMeta.Name),
 			},
-			Ports: []corev1.ServicePort{
-				{
-					Name: componentMeta.Name,
-					Port: constants.CommonDefaultHttpPort,
-					TargetPort: intstr.IntOrString{
-						Type:   intstr.Int,
-						IntVal: int32(port),
-					},
-					Protocol: corev1.ProtocolTCP,
-				},
-			},
+			Ports: servicePorts,
 		},
-	}
-	//Redirect the traffic to agent when logger and batcher is injected
-	if componentExt.Logger != nil || componentExt.Batcher != nil {
-		service.Spec.Ports[0].TargetPort = intstr.IntOrString{
-			Type:   intstr.String,
-			StrVal: constants.InferenceServiceDefaultAgentPort,
-		}
 	}
 	return service
 }
 
-//checkServiceExist checks if the service exists?
+// checkServiceExist checks if the service exists?
 func (r *ServiceReconciler) checkServiceExist(client client.Client) (constants.CheckResultType, *corev1.Service, error) {
 	//get service
 	existingService := &corev1.Service{}
@@ -116,7 +143,7 @@ func semanticServiceEquals(desired, existing *corev1.Service) bool {
 		equality.Semantic.DeepEqual(desired.Spec.Selector, existing.Spec.Selector)
 }
 
-//Reconcile ...
+// Reconcile ...
 func (r *ServiceReconciler) Reconcile() (*corev1.Service, error) {
 	//reconcile Service
 	checkResult, existingService, err := r.checkServiceExist(r.client)

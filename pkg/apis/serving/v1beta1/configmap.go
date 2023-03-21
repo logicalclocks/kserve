@@ -1,4 +1,5 @@
 /*
+Copyright 2021 The KServe Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"text/template"
 
 	"github.com/kserve/kserve/pkg/constants"
 	v1 "k8s.io/api/core/v1"
@@ -28,14 +30,17 @@ import (
 
 // ConfigMap Keys
 const (
-	PredictorConfigKeyName   = "predictors"
-	TransformerConfigKeyName = "transformers"
-	ExplainerConfigKeyName   = "explainers"
+	ExplainerConfigKeyName = "explainers"
 )
 
 const (
 	IngressConfigKeyName = "ingress"
 	DeployConfigName     = "deploy"
+
+	DefaultDomainTemplate = "{{ .Name }}-{{ .Namespace }}.{{ .IngressDomain }}"
+	DefaultIngressDomain  = "example.com"
+
+	DefaultUrlScheme = "http"
 )
 
 // +kubebuilder:object:generate=false
@@ -54,70 +59,23 @@ type ExplainersConfig struct {
 }
 
 // +kubebuilder:object:generate=false
-type PredictorConfig struct {
-	// predictor docker image name
-	ContainerImage string `json:"image"`
-	// default predictor docker image version on cpu
-	DefaultImageVersion string `json:"defaultImageVersion"`
-	// default predictor docker image version on gpu
-	DefaultGpuImageVersion string `json:"defaultGpuImageVersion"`
-	// Default timeout of predictor for serving a request, in seconds
-	DefaultTimeout int64 `json:"defaultTimeout,string,omitempty"`
-	// Flag to determine if multi-model serving is supported
-	MultiModelServer bool `json:"multiModelServer,boolean,omitempty"`
-	// frameworks the model agent is able to run
-	SupportedFrameworks []string `json:"supportedFrameworks"`
-}
-
-// +kubebuilder:object:generate=false
-type PredictorProtocols struct {
-	V1 *PredictorConfig `json:"v1,omitempty"`
-	V2 *PredictorConfig `json:"v2,omitempty"`
-}
-
-// +kubebuilder:object:generate=false
-type PredictorsConfig struct {
-	Tensorflow PredictorConfig    `json:"tensorflow,omitempty"`
-	Triton     PredictorConfig    `json:"triton,omitempty"`
-	XGBoost    PredictorProtocols `json:"xgboost,omitempty"`
-	SKlearn    PredictorProtocols `json:"sklearn,omitempty"`
-	PyTorch    PredictorProtocols `json:"pytorch,omitempty"`
-	ONNX       PredictorConfig    `json:"onnx,omitempty"`
-	PMML       PredictorConfig    `json:"pmml,omitempty"`
-	LightGBM   PredictorConfig    `json:"lightgbm,omitempty"`
-	Paddle     PredictorConfig    `json:"paddle,omitempty"`
-}
-
-// +kubebuilder:object:generate=false
-type TransformerConfig struct {
-	// transformer docker image name
-	ContainerImage string `json:"image"`
-	// default transformer docker image version
-	DefaultImageVersion string `json:"defaultImageVersion"`
-}
-
-// +kubebuilder:object:generate=false
-type TransformersConfig struct {
-	Feast TransformerConfig `json:"feast,omitempty"`
-}
-
-// +kubebuilder:object:generate=false
 type InferenceServicesConfig struct {
-	// Transformer configurations
-	Transformers TransformersConfig `json:"transformers"`
-	// Predictor configurations
-	Predictors PredictorsConfig `json:"predictors"`
 	// Explainer configurations
 	Explainers ExplainersConfig `json:"explainers"`
 }
 
 // +kubebuilder:object:generate=false
 type IngressConfig struct {
-	IngressGateway          string `json:"ingressGateway,omitempty"`
-	IngressServiceName      string `json:"ingressService,omitempty"`
-	LocalGateway            string `json:"localGateway,omitempty"`
-	LocalGatewayServiceName string `json:"localGatewayService,omitempty"`
-	IngressDomain           string `json:"ingressDomain,omitempty"`
+	IngressGateway          string  `json:"ingressGateway,omitempty"`
+	IngressServiceName      string  `json:"ingressService,omitempty"`
+	LocalGateway            string  `json:"localGateway,omitempty"`
+	LocalGatewayServiceName string  `json:"localGatewayService,omitempty"`
+	IngressDomain           string  `json:"ingressDomain,omitempty"`
+	IngressClassName        *string `json:"ingressClassName,omitempty"`
+	DomainTemplate          string  `json:"domainTemplate,omitempty"`
+	UrlScheme               string  `json:"urlScheme,omitempty"`
+	DisableIstioVirtualHost bool    `json:"disableIstioVirtualHost,omitempty"`
+	PathTemplate            string  `json:"pathTemplate,omitempty"`
 }
 
 // +kubebuilder:object:generate=false
@@ -133,9 +91,7 @@ func NewInferenceServicesConfig(cli client.Client) (*InferenceServicesConfig, er
 	}
 	icfg := &InferenceServicesConfig{}
 	for _, err := range []error{
-		getComponentConfig(PredictorConfigKeyName, configMap, &icfg.Predictors),
 		getComponentConfig(ExplainerConfigKeyName, configMap, &icfg.Explainers),
-		getComponentConfig(TransformerConfigKeyName, configMap, &icfg.Transformers),
 	} {
 		if err != nil {
 			return nil, err
@@ -154,13 +110,39 @@ func NewIngressConfig(cli client.Client) (*IngressConfig, error) {
 	if ingress, ok := configMap.Data[IngressConfigKeyName]; ok {
 		err := json.Unmarshal([]byte(ingress), &ingressConfig)
 		if err != nil {
-			return nil, fmt.Errorf("Unable to parse ingress config json: %v", err)
+			return nil, fmt.Errorf("unable to parse ingress config json: %v", err)
 		}
 
 		if ingressConfig.IngressGateway == "" || ingressConfig.IngressServiceName == "" {
-			return nil, fmt.Errorf("Invalid ingress config, ingressGateway, ingressService are required.")
+			return nil, fmt.Errorf("invalid ingress config - ingressGateway and ingressService are required")
+		}
+		if ingressConfig.PathTemplate != "" {
+			// TODO: ensure that the generated path is valid, that is:
+			// * both Name and Namespace are used to avoid collisions
+			// * starts with a /
+			// For now simply check that this is a valid template.
+			_, err := template.New("path-template").Parse(ingressConfig.PathTemplate)
+			if err != nil {
+				return nil, fmt.Errorf("Invalid ingress config, unable to parse pathTemplate: %v", err)
+			}
+			if ingressConfig.IngressDomain == "" {
+				return nil, fmt.Errorf("Invalid ingress config - igressDomain is required if pathTemplate is given")
+			}
 		}
 	}
+
+	if ingressConfig.DomainTemplate == "" {
+		ingressConfig.DomainTemplate = DefaultDomainTemplate
+	}
+
+	if ingressConfig.IngressDomain == "" {
+		ingressConfig.IngressDomain = DefaultIngressDomain
+	}
+
+	if ingressConfig.UrlScheme == "" {
+		ingressConfig.UrlScheme = DefaultUrlScheme
+	}
+
 	return ingressConfig, nil
 }
 

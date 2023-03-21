@@ -1,3 +1,4 @@
+# Copyright 2021 The KServe Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -10,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import pathlib
 
 from setuptools import setup, find_packages
 
@@ -19,33 +21,27 @@ tests_require = [
     'mypy'
 ]
 
+with open(pathlib.Path(__file__).parent.parent / 'VERSION') as version_file:
+    version = version_file.read().strip()
+
 setup(
     name='alibiexplainer',
-    version='0.7.0rc0',
+    version=version,
     author_email='cc@seldon.io',
     license='../../LICENSE.txt',
     url='https://github.com/kserve/kserve/python/alibiexplainer',
-    description='Model Explaination Server. \
+    description='Model Explanation Server. \
                  Not intended for use outside KServe Frameworks Images',
     long_description=open('README.md').read(),
-    python_requires='>=3.6',
+    python_requires='>=3.7',
     packages=find_packages("alibiexplainer"),
     install_requires=[
-        "tensorflow==2.3.2",
-        "kserve>=0.7.0rc0",
-        "pandas>=0.24.2",
+        f"kserve>={version}",
         "nest_asyncio>=1.4.0",
-        "alibi==0.6.0",
-        "scikit-learn == 0.20.3",
-        "argparse>=1.4.0",
-        "requests>=2.22.0",
+        "alibi==0.6.4",
         "joblib>=0.13.2",
-        "dill>=0.3.0",
-        "grpcio>=1.22.0",
-        "xgboost==1.0.2",
-        "shap==0.39.0",
-        "numpy<1.19.0",
-        'spacy[lookups]>=2.0.0, <4.0.0'
+        "xgboost==1.6.1",
+        "shap==0.41.0",
     ],
     tests_require=tests_require,
     extras_require={'test': tests_require}

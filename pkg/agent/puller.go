@@ -1,4 +1,5 @@
 /*
+Copyright 2021 The KServe Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,10 +19,11 @@ package agent
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"path/filepath"
 	"sync"
+	"syscall"
 
 	"github.com/kserve/kserve/pkg/agent/storage"
 	v1 "github.com/kserve/kserve/pkg/apis/serving/v1alpha1"
@@ -64,6 +66,12 @@ func StartPullerAndProcessModels(downloader *Downloader, commands <-chan ModelOp
 		Downloader:  downloader,
 		logger:      logger,
 	}
+
+	// Change umask to ensure we have control over the downloaded file
+	// permissions:
+	// https://stackoverflow.com/a/61645606/5015573
+	syscall.Umask(0)
+
 	puller.waitGroup.wg.Add(len(commands))
 	go puller.processCommands(commands)
 	puller.waitGroup.wg.Wait()
@@ -159,7 +167,7 @@ func (p *Puller) modelProcessor(modelName string, ops <-chan *ModelOp) {
 					if resp.StatusCode == 200 {
 						p.logger.Infof("Successfully loaded model %s", modelName)
 					} else {
-						body, err := ioutil.ReadAll(resp.Body)
+						body, err := io.ReadAll(resp.Body)
 						if err == nil {
 							p.logger.Infof("Failed to load model %s with status [%d] and resp:%v", modelName, resp.StatusCode, body)
 						}
@@ -184,7 +192,7 @@ func (p *Puller) modelProcessor(modelName string, ops <-chan *ModelOp) {
 					if resp.StatusCode == 200 {
 						p.logger.Infof("Successfully unloaded model %s", modelName)
 					} else {
-						body, err := ioutil.ReadAll(resp.Body)
+						body, err := io.ReadAll(resp.Body)
 						if err == nil {
 							p.logger.Infof("Failed to unload model %s with status [%d] and resp:%v", modelName, resp.StatusCode, body)
 						}

@@ -53,7 +53,7 @@ $inferenceservice.serving.kserve.io/torchserve-custom created
 
 ## Run a prediction
 
-The first step is to [determine the ingress IP and ports](../../../../../../README.md#determine-the-ingress-ip-and-ports) and set `INGRESS_HOST` and `INGRESS_PORT`
+The first step is to [determine the ingress IP and ports](https://kserve.github.io/website/master/get_started/first_isvc/#4-determine-the-ingress-ip-and-ports) and set `INGRESS_HOST` and `INGRESS_PORT`
 
 ```bash
 MODEL_NAME=torchserve-custom
@@ -67,7 +67,7 @@ Expected Output
 *   Trying 52.89.19.61...
 * Connected to a881f5a8c676a41edbccdb0a394a80d6-2069247558.us-west-2.elb.amazonaws.com (52.89.19.61) port 80 (#0)
 > PUT /predictions/mnist HTTP/1.1
-> Host: torchserve-custom.kfserving-test.example.com
+> Host: torchserve-custom.kserve-test.example.com
 > User-Agent: curl/7.47.0
 > Accept: */*
 > Content-Length: 167
@@ -92,7 +92,7 @@ Expected Output
 ### Get Pods
 
 ```bash
-Kubectl get pods -n kfserving-test
+Kubectl get pods -n kserve-test
 
 NAME                                                             READY   STATUS        RESTARTS   AGE
 torchserve-custom-predictor-default-cj2d8-deployment-69444c9c74-tsrwr   2/2     Running       0          113s
@@ -101,7 +101,7 @@ torchserve-custom-predictor-default-cj2d8-deployment-69444c9c74-vvpjl   2/2     
 
 ## Get Revisions
 
-Install [Knative CLI tool](https://knative.dev/docs/install/install-kn/)
+Install [Knative CLI tool](https://knative.dev/docs/client/install-kn/)
 
 ```bash
 kn revision list -n <namespace>

@@ -11,25 +11,35 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import List, Dict
+from typing import List, Dict, Union
 import logging
-import kserve
+
 import http.client
 import json
+import numpy as np
+from cloudevents.http import CloudEvent
+from tritonclient.grpc import service_pb2 as pb
+from tritonclient.grpc import InferResult
+
+import kserve
+from kserve import InferRequest, InferResponse
+from kserve.protocol.grpc.grpc_predict_v2_pb2 import ModelInferResponse
 
 logging.basicConfig(level=kserve.constants.KSERVE_LOGLEVEL)
 
 
-class DriverTransformer(kserve.KFModel):
+class DriverTransformer(kserve.Model):
     """ A class object for the data handling activities of driver ranking
     Task and returns a KServe compatible response.
 
     Args:
-        kserve (class object): The KFModel class from the KServe
-        modeule is passed here.
+        kserve (class object): The Model class from the KServe
+        module is passed here.
     """
+
     def __init__(self, name: str,
                  predictor_host: str,
+                 protocol: str,
                  feast_serving_url: str,
                  entity_ids: List[str],
                  feature_refs: List[str]):
@@ -39,6 +49,7 @@ class DriverTransformer(kserve.KFModel):
         Args:
             name (str): Name of the model.
             predictor_host (str): The host in which the predictor runs.
+            protocol (str): The protocol in which the predictor runs.
             feast_serving_url (str): The Feast feature server URL, in the form
             of <host_name:port>
             entity_ids (List[str]): The entity IDs for which to retrieve
@@ -48,12 +59,13 @@ class DriverTransformer(kserve.KFModel):
         """
         super().__init__(name)
         self.predictor_host = predictor_host
+        self.protocol = protocol
         self.feast_serving_url = feast_serving_url
         self.entity_ids = entity_ids
         self.feature_refs = feature_refs
         self.feature_refs_key = [feature_refs[i].replace(":", "__") for i in range(len(feature_refs))]
-
         logging.info("Model name = %s", name)
+        logging.info("Protocol = %s", protocol)
         logging.info("Predictor host = %s", predictor_host)
         logging.info("Feast serving URL = %s", feast_serving_url)
         logging.info("Entity ids = %s", entity_ids)
@@ -78,7 +90,7 @@ class DriverTransformer(kserve.KFModel):
         return entity_rows
 
     def buildPredictRequest(self, inputs, features) -> Dict:
-        """Build the predict request for all entitys and return it as a dict.
+        """Build the predict request for all entities and return it as a dict.
 
         Args:
             inputs (Dict): entity ids from http request
@@ -96,16 +108,42 @@ class DriverTransformer(kserve.KFModel):
                 entity_req.append(features["field_values"][i]["fields"][self.entity_ids[j]])
                 request_data.insert(i, entity_req)
 
-        return {'instances': request_data}
+        # The default protocol is v1
+        result = {'instances': request_data}
+        if self.protocol == "v2":
+            result = {'inputs': [
+                {
+                    "name": "predict",
+                    "shape": [len(features["field_values"]), len(self.feature_refs_key) + 1],
+                    "datatype": "FP32",
+                    "data": request_data
+                }
+            ]
+            }
+        if self.protocol == "grpc-v2":
+            data = np.array(request_data, dtype=np.float32).flatten()
+            tensor_contents = pb.InferTensorContents(fp32_contents=data)
+            inputs = pb.ModelInferRequest().InferInputTensor(
+                name="predict",
+                shape=[len(features["field_values"]), len(self.feature_refs_key) + 1],
+                datatype="FP32",
+                contents=tensor_contents
+            )
 
-    def preprocess(self, inputs: Dict) -> Dict:
+            result = pb.ModelInferRequest(model_name=self.name, inputs=[inputs])
+
+        return result
+
+    def preprocess(self, inputs: Union[Dict, CloudEvent, InferRequest],
+                   headers: Dict[str, str] = None) -> Union[Dict, InferRequest]:
         """Pre-process activity of the driver input data.
 
         Args:
-            inputs (Dict): http request
+            inputs (Dict|CloudEvent|InferRequest): Body of the request, v2 endpoints pass InferRequest.
+            headers (Dict): Request headers.
 
         Returns:
-            Dict: Returns the request input after ingesting online features
+            Dict|InferRequest: Transformed inputs to ``predict`` handler or return InferRequest for predictor call.
         """
 
         headers = {"Content-type": "application/json", "Accept": "application/json"}
@@ -125,17 +163,21 @@ class DriverTransformer(kserve.KFModel):
 
         return outputs
 
-    def postprocess(self, inputs: List) -> List:
+    def postprocess(self, response: Union[Dict, InferResponse, ModelInferResponse], headers: Dict[str, str] = None) \
+            -> Union[Dict, ModelInferResponse]:
         """Post process function of the driver ranking output data. Here we
-        simply pass the raw rankings through.
+        simply pass the raw rankings through. Convert gRPC response if needed.
 
         Args:
-            inputs (List): The list of the inputs
+            response (Dict|InferResponse|ModelInferResponse): The response passed from ``predict`` handler.
+            headers (Dict): Request headers.
 
         Returns:
-            List: If a post process functionality is specified, it could convert
+            Dict: If a post process functionality is specified, it could convert
             raw rankings into a different list.
         """
-        logging.info("The output from model predict is %s", inputs)
-
-        return inputs
+        logging.info("The output from model predict is %s", response)
+        if self.protocol == "grpc-v2":
+            response = InferResult(response)
+            return response.get_response(as_json=True)
+        return response

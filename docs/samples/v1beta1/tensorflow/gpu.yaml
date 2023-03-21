@@ -1,13 +1,11 @@
-apiVersion: "serving.kubeflow.org/v1alpha3"
-kind: "Service"
+apiVersion: "serving.kserve.io/v1beta1"
+kind: "InferenceService"
 metadata:
   name: "tensorflow-gpu"
 spec:
   predictor:
     tensorflow:
-      storageUri: "gs://kfserving-samples/models/tensorflow/flowers"
+      storageUri: "gs://kfserving-examples/models/tensorflow/flowers"
       resources:
         limits:
           nvidia.com/gpu: 1
-    nodeSelector:
-      cloud.google.com/gke-accelerator: nvidia-tesla-k80

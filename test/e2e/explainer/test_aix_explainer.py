@@ -25,6 +25,7 @@ from kserve import V1beta1AIXExplainerSpec
 from kserve import V1beta1InferenceService
 from kubernetes.client import V1ResourceRequirements
 from kubernetes.client import V1Container
+import pytest
 
 from ..common.utils import predict
 from ..common.utils import explain_aix
@@ -36,6 +37,7 @@ logging.basicConfig(level=logging.INFO)
 kserve_client = KServeClient(config_file=os.environ.get("KUBECONFIG", "~/.kube/config"))
 
 
+@pytest.mark.explainer
 def test_tabular_explainer():
     service_name = 'aix-explainer'
     predictor = V1beta1PredictorSpec(
@@ -44,8 +46,9 @@ def test_tabular_explainer():
                     image='aipipeline/rf-predictor:0.4.0',
                     command=["python", "-m", "rfserver", "--model_name", "aix-explainer"],
                     resources=V1ResourceRequirements(
-                        requests={'cpu': '500m', 'memory': '1Gi'},
-                        limits={'cpu': '500m', 'memory': '1Gi'}))]
+                        requests={'cpu': '10m', 'memory': '128Mi'},
+                        limits={'cpu': '100m', 'memory': '256Mi'}
+                    ))]
     )
     explainer = V1beta1ExplainerSpec(
         min_replicas=1,
@@ -53,8 +56,9 @@ def test_tabular_explainer():
             name='explainer',
             type='LimeImages',
             resources=V1ResourceRequirements(
-                requests={'cpu': '500m', 'memory': '1Gi'},
-                limits={'cpu': '500m', 'memory': '1Gi'})
+                requests={'cpu': '10m', 'memory': '128Mi'},
+                limits={'cpu': '100m', 'memory': '512Mi'}
+            )
         )
     )
 
@@ -78,9 +82,9 @@ def test_tabular_explainer():
         raise e
 
     res = predict(service_name, './data/mnist_input.json')
-    assert(res["predictions"] == [[0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]])
+    assert (res["predictions"] == [[0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]])
 
     mask = explain_aix(service_name, './data/mnist_input.json')
     percent_in_mask = np.count_nonzero(mask) / np.size(np.array(mask))
-    assert(percent_in_mask > 0.6)
+    assert (percent_in_mask > 0.6)
     kserve_client.delete(service_name, KSERVE_TEST_NAMESPACE)

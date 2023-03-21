@@ -6,7 +6,7 @@ namespace: kserve
 
 # Labels to add to all resources and selectors.
 #commonLabels:
-#  someName: someValue
+#  app.kubernetes.io/name: kserve
 
 bases:
 - ../crd
@@ -36,21 +36,7 @@ patchesStrategicMerge:
 generatorOptions:
   disableNameSuffixHash: true
 
-# To make namespace for standalone installation kustomizable,
-# variabalize ingress gateway, webhook service name and
-# kserve namespace in webhook configurations
-configMapGenerator:
-  - name: kserve-config
-    envs:
-    - params.env
 vars:
-- name: ingressGateway
-  objref:
-    kind: ConfigMap
-    name: kserve-config
-    apiVersion: v1
-  fieldref:
-    fieldpath: data.ingressGateway
 - fieldref:
     fieldpath: metadata.name
   name: webhookServiceName
@@ -62,7 +48,7 @@ vars:
   objref:
     kind: Certificate
     group: cert-manager.io
-    version: v1alpha2
+    version: v1
     name: serving-cert
   fieldref:
     fieldpath: metadata.namespace

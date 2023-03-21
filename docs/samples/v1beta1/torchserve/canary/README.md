@@ -10,7 +10,7 @@ metadata:
 spec:
   predictor:
     pytorch:
-      storageUri: "gs://kfserving-examples/models/torchserve/image_classifier"
+      storageUri: "gs://kfserving-examples/models/torchserve/image_classifier/v1"
 ```
 
 Apply the InferenceService
@@ -46,7 +46,9 @@ Apply the InferenceService
 ```bash
 kubectl apply -f canary.yaml
 ```
+
 You should now see two revisions created
+
 ```bash
 kubectl get revisions -l serving.kserve.io/inferenceservice=torchserve
 NAME                                 CONFIG NAME                    K8S SERVICE NAME                     GENERATION   READY   REASON
@@ -54,10 +56,9 @@ torchserve-predictor-default-9lttm   torchserve-predictor-default   torchserve-p
 torchserve-predictor-default-kxp96   torchserve-predictor-default   torchserve-predictor-default-kxp96   2            True
 ```
 
-
 ## Run a prediction
 
-The first step is to [determine the ingress IP and ports](../../../../../README.md#determine-the-ingress-ip-and-ports) and set `INGRESS_HOST` and `INGRESS_PORT`
+The first step is to [determine the ingress IP and ports](https://kserve.github.io/website/master/get_started/first_isvc/#4-determine-the-ingress-ip-and-ports) and set `INGRESS_HOST` and `INGRESS_PORT`
 
 ```bash
 MODEL_NAME=mnist
@@ -72,7 +73,7 @@ Expected Output
 *   Trying 52.89.19.61...
 * Connected to a881f5a8c676a41edbccdb0a394a80d6-2069247558.us-west-2.elb.amazonaws.com (52.89.19.61) port 80 (#0)
 > PUT /v1/models/mnist:predict HTTP/1.1
-> Host: torchserve.kfserving-test.example.com
+> Host: torchserve.kserve-test.example.com
 > User-Agent: curl/7.47.0
 > Accept: */*
 > Content-Length: 167
@@ -104,6 +105,7 @@ torchserve-predictor-default-kxp96-deployment-5d949864df-bmzfk   2/2     Running
 ```
 
 Check the traffic split
+
 ```bash
 kubectl get ksvc torchserve-predictor-default -oyaml
   status:

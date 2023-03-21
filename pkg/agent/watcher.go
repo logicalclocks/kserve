@@ -1,4 +1,5 @@
 /*
+Copyright 2021 The KServe Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,7 +19,7 @@ package agent
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 
 	"github.com/fsnotify/fsnotify"
@@ -61,7 +62,7 @@ type modelWrapper struct {
 }
 
 func (w *Watcher) syncModelConfig(modelConfigFile string, initializing bool) error {
-	file, err := ioutil.ReadFile(modelConfigFile)
+	file, err := os.ReadFile(modelConfigFile)
 	if err != nil {
 		return err
 	} else {

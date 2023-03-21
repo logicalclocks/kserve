@@ -1,4 +1,5 @@
 /*
+Copyright 2021 The KServe Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -50,4 +51,5 @@ func Resource(resource string) schema.GroupResource {
 
 func init() {
 	SchemeBuilder.Register(&TrainedModel{}, &TrainedModelList{})
+	SchemeBuilder.Register(&InferenceGraph{}, &InferenceGraphList{})
 }

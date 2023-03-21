@@ -1,4 +1,5 @@
 /*
+Copyright 2021 The KServe Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,7 +23,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/googleapis/google-cloud-go-testing/storage/stiface"
 	"google.golang.org/api/iterator"
-	"io/ioutil"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -77,7 +78,7 @@ func (g *GCSObjectDownloader) Download(client stiface.Client, it stiface.ObjectI
 	var errs []error
 	// flag to help determine if query prefix returned an empty iterator
 	var foundObject = false
-	
+
 	for {
 		attrs, err := it.Next()
 		if err == iterator.Done {
@@ -88,7 +89,7 @@ func (g *GCSObjectDownloader) Download(client stiface.Client, it stiface.ObjectI
 		}
 		objectValue := strings.TrimPrefix(attrs.Name, g.Item)
 		fileName := filepath.Join(g.ModelDir, g.ModelName, objectValue)
-		
+
 		foundObject = true
 		if FileExists(fileName) {
 			log.Info("Deleting", fileName)
@@ -123,7 +124,7 @@ func (g *GCSObjectDownloader) DownloadFile(client stiface.Client, attrs *gstorag
 		)
 	}
 	defer reader.Close()
-	data, err := ioutil.ReadAll(reader)
+	data, err := io.ReadAll(reader)
 	if err != nil {
 		return fmt.Errorf("failed to read object(%s) in bucket(%s): %v",
 			attrs.Name,

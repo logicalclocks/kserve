@@ -1,4 +1,5 @@
 /*
+Copyright 2021 The KServe Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -58,6 +59,10 @@ func (c *CustomExplainer) GetStorageUri() *string {
 			return &envVar.Value
 		}
 	}
+	return nil
+}
+
+func (c *CustomExplainer) GetStorageSpec() *StorageSpec {
 	return nil
 }
 

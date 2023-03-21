@@ -1,3 +1,4 @@
+# Copyright 2022 The KServe Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -68,9 +69,11 @@ class V1beta1PredictorSpec(object):
         'logger': 'V1beta1LoggerSpec',
         'max_replicas': 'int',
         'min_replicas': 'int',
+        'model': 'V1beta1ModelSpec',
         'node_name': 'str',
         'node_selector': 'dict(str, str)',
         'onnx': 'V1beta1ONNXRuntimeSpec',
+        'os': 'V1PodOS',
         'overhead': 'dict(str, ResourceQuantity)',
         'paddle': 'V1beta1PaddleServerSpec',
         'pmml': 'V1beta1PMMLSpec',
@@ -81,6 +84,8 @@ class V1beta1PredictorSpec(object):
         'readiness_gates': 'list[V1PodReadinessGate]',
         'restart_policy': 'str',
         'runtime_class_name': 'str',
+        'scale_metric': 'str',
+        'scale_target': 'int',
         'scheduler_name': 'str',
         'security_context': 'V1PodSecurityContext',
         'service_account': 'str',
@@ -122,9 +127,11 @@ class V1beta1PredictorSpec(object):
         'logger': 'logger',
         'max_replicas': 'maxReplicas',
         'min_replicas': 'minReplicas',
+        'model': 'model',
         'node_name': 'nodeName',
         'node_selector': 'nodeSelector',
         'onnx': 'onnx',
+        'os': 'os',
         'overhead': 'overhead',
         'paddle': 'paddle',
         'pmml': 'pmml',
@@ -135,6 +142,8 @@ class V1beta1PredictorSpec(object):
         'readiness_gates': 'readinessGates',
         'restart_policy': 'restartPolicy',
         'runtime_class_name': 'runtimeClassName',
+        'scale_metric': 'scaleMetric',
+        'scale_target': 'scaleTarget',
         'scheduler_name': 'schedulerName',
         'security_context': 'securityContext',
         'service_account': 'serviceAccount',
@@ -153,7 +162,7 @@ class V1beta1PredictorSpec(object):
         'xgboost': 'xgboost'
     }
 
-    def __init__(self, active_deadline_seconds=None, affinity=None, automount_service_account_token=None, batcher=None, canary_traffic_percent=None, container_concurrency=None, containers=None, dns_config=None, dns_policy=None, enable_service_links=None, ephemeral_containers=None, host_aliases=None, host_ipc=None, host_network=None, host_pid=None, hostname=None, image_pull_secrets=None, init_containers=None, lightgbm=None, logger=None, max_replicas=None, min_replicas=None, node_name=None, node_selector=None, onnx=None, overhead=None, paddle=None, pmml=None, preemption_policy=None, priority=None, priority_class_name=None, pytorch=None, readiness_gates=None, restart_policy=None, runtime_class_name=None, scheduler_name=None, security_context=None, service_account=None, service_account_name=None, set_hostname_as_fqdn=None, share_process_namespace=None, sklearn=None, subdomain=None, tensorflow=None, termination_grace_period_seconds=None, timeout=None, tolerations=None, topology_spread_constraints=None, triton=None, volumes=None, xgboost=None, local_vars_configuration=None):  # noqa: E501
+    def __init__(self, active_deadline_seconds=None, affinity=None, automount_service_account_token=None, batcher=None, canary_traffic_percent=None, container_concurrency=None, containers=None, dns_config=None, dns_policy=None, enable_service_links=None, ephemeral_containers=None, host_aliases=None, host_ipc=None, host_network=None, host_pid=None, hostname=None, image_pull_secrets=None, init_containers=None, lightgbm=None, logger=None, max_replicas=None, min_replicas=None, model=None, node_name=None, node_selector=None, onnx=None, os=None, overhead=None, paddle=None, pmml=None, preemption_policy=None, priority=None, priority_class_name=None, pytorch=None, readiness_gates=None, restart_policy=None, runtime_class_name=None, scale_metric=None, scale_target=None, scheduler_name=None, security_context=None, service_account=None, service_account_name=None, set_hostname_as_fqdn=None, share_process_namespace=None, sklearn=None, subdomain=None, tensorflow=None, termination_grace_period_seconds=None, timeout=None, tolerations=None, topology_spread_constraints=None, triton=None, volumes=None, xgboost=None, local_vars_configuration=None):  # noqa: E501
         """V1beta1PredictorSpec - a model defined in OpenAPI"""  # noqa: E501
         if local_vars_configuration is None:
             local_vars_configuration = Configuration()
@@ -181,9 +190,11 @@ class V1beta1PredictorSpec(object):
         self._logger = None
         self._max_replicas = None
         self._min_replicas = None
+        self._model = None
         self._node_name = None
         self._node_selector = None
         self._onnx = None
+        self._os = None
         self._overhead = None
         self._paddle = None
         self._pmml = None
@@ -194,6 +205,8 @@ class V1beta1PredictorSpec(object):
         self._readiness_gates = None
         self._restart_policy = None
         self._runtime_class_name = None
+        self._scale_metric = None
+        self._scale_target = None
         self._scheduler_name = None
         self._security_context = None
         self._service_account = None
@@ -256,12 +269,16 @@ class V1beta1PredictorSpec(object):
             self.max_replicas = max_replicas
         if min_replicas is not None:
             self.min_replicas = min_replicas
+        if model is not None:
+            self.model = model
         if node_name is not None:
             self.node_name = node_name
         if node_selector is not None:
             self.node_selector = node_selector
         if onnx is not None:
             self.onnx = onnx
+        if os is not None:
+            self.os = os
         if overhead is not None:
             self.overhead = overhead
         if paddle is not None:
@@ -282,6 +299,10 @@ class V1beta1PredictorSpec(object):
             self.restart_policy = restart_policy
         if runtime_class_name is not None:
             self.runtime_class_name = runtime_class_name
+        if scale_metric is not None:
+            self.scale_metric = scale_metric
+        if scale_target is not None:
+            self.scale_target = scale_target
         if scheduler_name is not None:
             self.scheduler_name = scheduler_name
         if security_context is not None:
@@ -543,7 +564,7 @@ class V1beta1PredictorSpec(object):
     def ephemeral_containers(self):
         """Gets the ephemeral_containers of this V1beta1PredictorSpec.  # noqa: E501
 
-        List of ephemeral containers run in this pod. Ephemeral containers may be run in an existing pod to perform user-initiated actions such as debugging. This list cannot be specified when creating a pod, and it cannot be modified by updating the pod spec. In order to add an ephemeral container to an existing pod, use the pod's ephemeralcontainers subresource. This field is alpha-level and is only honored by servers that enable the EphemeralContainers feature.  # noqa: E501
+        List of ephemeral containers run in this pod. Ephemeral containers may be run in an existing pod to perform user-initiated actions such as debugging. This list cannot be specified when creating a pod, and it cannot be modified by updating the pod spec. In order to add an ephemeral container to an existing pod, use the pod's ephemeralcontainers subresource. This field is beta-level and available on clusters that haven't disabled the EphemeralContainers feature gate.  # noqa: E501
 
         :return: The ephemeral_containers of this V1beta1PredictorSpec.  # noqa: E501
         :rtype: list[V1EphemeralContainer]
@@ -554,7 +575,7 @@ class V1beta1PredictorSpec(object):
     def ephemeral_containers(self, ephemeral_containers):
         """Sets the ephemeral_containers of this V1beta1PredictorSpec.
 
-        List of ephemeral containers run in this pod. Ephemeral containers may be run in an existing pod to perform user-initiated actions such as debugging. This list cannot be specified when creating a pod, and it cannot be modified by updating the pod spec. In order to add an ephemeral container to an existing pod, use the pod's ephemeralcontainers subresource. This field is alpha-level and is only honored by servers that enable the EphemeralContainers feature.  # noqa: E501
+        List of ephemeral containers run in this pod. Ephemeral containers may be run in an existing pod to perform user-initiated actions such as debugging. This list cannot be specified when creating a pod, and it cannot be modified by updating the pod spec. In order to add an ephemeral container to an existing pod, use the pod's ephemeralcontainers subresource. This field is beta-level and available on clusters that haven't disabled the EphemeralContainers feature gate.  # noqa: E501
 
         :param ephemeral_containers: The ephemeral_containers of this V1beta1PredictorSpec.  # noqa: E501
         :type: list[V1EphemeralContainer]
@@ -812,6 +833,27 @@ class V1beta1PredictorSpec(object):
         self._min_replicas = min_replicas
 
     @property
+    def model(self):
+        """Gets the model of this V1beta1PredictorSpec.  # noqa: E501
+
+
+        :return: The model of this V1beta1PredictorSpec.  # noqa: E501
+        :rtype: V1beta1ModelSpec
+        """
+        return self._model
+
+    @model.setter
+    def model(self, model):
+        """Sets the model of this V1beta1PredictorSpec.
+
+
+        :param model: The model of this V1beta1PredictorSpec.  # noqa: E501
+        :type: V1beta1ModelSpec
+        """
+
+        self._model = model
+
+    @property
     def node_name(self):
         """Gets the node_name of this V1beta1PredictorSpec.  # noqa: E501
 
@@ -879,10 +921,31 @@ class V1beta1PredictorSpec(object):
         self._onnx = onnx
 
     @property
+    def os(self):
+        """Gets the os of this V1beta1PredictorSpec.  # noqa: E501
+
+
+        :return: The os of this V1beta1PredictorSpec.  # noqa: E501
+        :rtype: V1PodOS
+        """
+        return self._os
+
+    @os.setter
+    def os(self, os):
+        """Sets the os of this V1beta1PredictorSpec.
+
+
+        :param os: The os of this V1beta1PredictorSpec.  # noqa: E501
+        :type: V1PodOS
+        """
+
+        self._os = os
+
+    @property
     def overhead(self):
         """Gets the overhead of this V1beta1PredictorSpec.  # noqa: E501
 
-        Overhead represents the resource overhead associated with running a pod for a given RuntimeClass. This field will be autopopulated at admission time by the RuntimeClass admission controller. If the RuntimeClass admission controller is enabled, overhead must not be set in Pod create requests. The RuntimeClass admission controller will reject Pod create requests which have the overhead already set. If RuntimeClass is configured and selected in the PodSpec, Overhead will be set to the value defined in the corresponding RuntimeClass, otherwise it will remain unset and treated as zero. More info: https://git.k8s.io/enhancements/keps/sig-node/20190226-pod-overhead.md This field is alpha-level as of Kubernetes v1.16, and is only honored by servers that enable the PodOverhead feature.  # noqa: E501
+        Overhead represents the resource overhead associated with running a pod for a given RuntimeClass. This field will be autopopulated at admission time by the RuntimeClass admission controller. If the RuntimeClass admission controller is enabled, overhead must not be set in Pod create requests. The RuntimeClass admission controller will reject Pod create requests which have the overhead already set. If RuntimeClass is configured and selected in the PodSpec, Overhead will be set to the value defined in the corresponding RuntimeClass, otherwise it will remain unset and treated as zero. More info: https://git.k8s.io/enhancements/keps/sig-node/688-pod-overhead/README.md This field is beta-level as of Kubernetes v1.18, and is only honored by servers that enable the PodOverhead feature.  # noqa: E501
 
         :return: The overhead of this V1beta1PredictorSpec.  # noqa: E501
         :rtype: dict(str, ResourceQuantity)
@@ -893,7 +956,7 @@ class V1beta1PredictorSpec(object):
     def overhead(self, overhead):
         """Sets the overhead of this V1beta1PredictorSpec.
 
-        Overhead represents the resource overhead associated with running a pod for a given RuntimeClass. This field will be autopopulated at admission time by the RuntimeClass admission controller. If the RuntimeClass admission controller is enabled, overhead must not be set in Pod create requests. The RuntimeClass admission controller will reject Pod create requests which have the overhead already set. If RuntimeClass is configured and selected in the PodSpec, Overhead will be set to the value defined in the corresponding RuntimeClass, otherwise it will remain unset and treated as zero. More info: https://git.k8s.io/enhancements/keps/sig-node/20190226-pod-overhead.md This field is alpha-level as of Kubernetes v1.16, and is only honored by servers that enable the PodOverhead feature.  # noqa: E501
+        Overhead represents the resource overhead associated with running a pod for a given RuntimeClass. This field will be autopopulated at admission time by the RuntimeClass admission controller. If the RuntimeClass admission controller is enabled, overhead must not be set in Pod create requests. The RuntimeClass admission controller will reject Pod create requests which have the overhead already set. If RuntimeClass is configured and selected in the PodSpec, Overhead will be set to the value defined in the corresponding RuntimeClass, otherwise it will remain unset and treated as zero. More info: https://git.k8s.io/enhancements/keps/sig-node/688-pod-overhead/README.md This field is beta-level as of Kubernetes v1.18, and is only honored by servers that enable the PodOverhead feature.  # noqa: E501
 
         :param overhead: The overhead of this V1beta1PredictorSpec.  # noqa: E501
         :type: dict(str, ResourceQuantity)
@@ -1037,7 +1100,7 @@ class V1beta1PredictorSpec(object):
     def readiness_gates(self):
         """Gets the readiness_gates of this V1beta1PredictorSpec.  # noqa: E501
 
-        If specified, all readiness gates will be evaluated for pod readiness. A pod is ready when all its containers are ready AND all conditions specified in the readiness gates have status equal to \"True\" More info: https://git.k8s.io/enhancements/keps/sig-network/0007-pod-ready%2B%2B.md  # noqa: E501
+        If specified, all readiness gates will be evaluated for pod readiness. A pod is ready when all its containers are ready AND all conditions specified in the readiness gates have status equal to \"True\" More info: https://git.k8s.io/enhancements/keps/sig-network/580-pod-readiness-gates  # noqa: E501
 
         :return: The readiness_gates of this V1beta1PredictorSpec.  # noqa: E501
         :rtype: list[V1PodReadinessGate]
@@ -1048,7 +1111,7 @@ class V1beta1PredictorSpec(object):
     def readiness_gates(self, readiness_gates):
         """Sets the readiness_gates of this V1beta1PredictorSpec.
 
-        If specified, all readiness gates will be evaluated for pod readiness. A pod is ready when all its containers are ready AND all conditions specified in the readiness gates have status equal to \"True\" More info: https://git.k8s.io/enhancements/keps/sig-network/0007-pod-ready%2B%2B.md  # noqa: E501
+        If specified, all readiness gates will be evaluated for pod readiness. A pod is ready when all its containers are ready AND all conditions specified in the readiness gates have status equal to \"True\" More info: https://git.k8s.io/enhancements/keps/sig-network/580-pod-readiness-gates  # noqa: E501
 
         :param readiness_gates: The readiness_gates of this V1beta1PredictorSpec.  # noqa: E501
         :type: list[V1PodReadinessGate]
@@ -1083,7 +1146,7 @@ class V1beta1PredictorSpec(object):
     def runtime_class_name(self):
         """Gets the runtime_class_name of this V1beta1PredictorSpec.  # noqa: E501
 
-        RuntimeClassName refers to a RuntimeClass object in the node.k8s.io group, which should be used to run this pod.  If no RuntimeClass resource matches the named class, the pod will not be run. If unset or empty, the \"legacy\" RuntimeClass will be used, which is an implicit class with an empty definition that uses the default runtime handler. More info: https://git.k8s.io/enhancements/keps/sig-node/runtime-class.md This is a beta feature as of Kubernetes v1.14.  # noqa: E501
+        RuntimeClassName refers to a RuntimeClass object in the node.k8s.io group, which should be used to run this pod.  If no RuntimeClass resource matches the named class, the pod will not be run. If unset or empty, the \"legacy\" RuntimeClass will be used, which is an implicit class with an empty definition that uses the default runtime handler. More info: https://git.k8s.io/enhancements/keps/sig-node/585-runtime-class This is a beta feature as of Kubernetes v1.14.  # noqa: E501
 
         :return: The runtime_class_name of this V1beta1PredictorSpec.  # noqa: E501
         :rtype: str
@@ -1094,13 +1157,59 @@ class V1beta1PredictorSpec(object):
     def runtime_class_name(self, runtime_class_name):
         """Sets the runtime_class_name of this V1beta1PredictorSpec.
 
-        RuntimeClassName refers to a RuntimeClass object in the node.k8s.io group, which should be used to run this pod.  If no RuntimeClass resource matches the named class, the pod will not be run. If unset or empty, the \"legacy\" RuntimeClass will be used, which is an implicit class with an empty definition that uses the default runtime handler. More info: https://git.k8s.io/enhancements/keps/sig-node/runtime-class.md This is a beta feature as of Kubernetes v1.14.  # noqa: E501
+        RuntimeClassName refers to a RuntimeClass object in the node.k8s.io group, which should be used to run this pod.  If no RuntimeClass resource matches the named class, the pod will not be run. If unset or empty, the \"legacy\" RuntimeClass will be used, which is an implicit class with an empty definition that uses the default runtime handler. More info: https://git.k8s.io/enhancements/keps/sig-node/585-runtime-class This is a beta feature as of Kubernetes v1.14.  # noqa: E501
 
         :param runtime_class_name: The runtime_class_name of this V1beta1PredictorSpec.  # noqa: E501
         :type: str
         """
 
         self._runtime_class_name = runtime_class_name
+
+    @property
+    def scale_metric(self):
+        """Gets the scale_metric of this V1beta1PredictorSpec.  # noqa: E501
+
+        ScaleMetric defines the scaling metric type watched by autoscaler possible values are concurrency, rps, cpu, memory. concurrency, rps are supported via Knative Pod Autoscaler(https://knative.dev/docs/serving/autoscaling/autoscaling-metrics).  # noqa: E501
+
+        :return: The scale_metric of this V1beta1PredictorSpec.  # noqa: E501
+        :rtype: str
+        """
+        return self._scale_metric
+
+    @scale_metric.setter
+    def scale_metric(self, scale_metric):
+        """Sets the scale_metric of this V1beta1PredictorSpec.
+
+        ScaleMetric defines the scaling metric type watched by autoscaler possible values are concurrency, rps, cpu, memory. concurrency, rps are supported via Knative Pod Autoscaler(https://knative.dev/docs/serving/autoscaling/autoscaling-metrics).  # noqa: E501
+
+        :param scale_metric: The scale_metric of this V1beta1PredictorSpec.  # noqa: E501
+        :type: str
+        """
+
+        self._scale_metric = scale_metric
+
+    @property
+    def scale_target(self):
+        """Gets the scale_target of this V1beta1PredictorSpec.  # noqa: E501
+
+        ScaleTarget specifies the integer target value of the metric type the Autoscaler watches for. concurrency and rps targets are supported by Knative Pod Autoscaler (https://knative.dev/docs/serving/autoscaling/autoscaling-targets/).  # noqa: E501
+
+        :return: The scale_target of this V1beta1PredictorSpec.  # noqa: E501
+        :rtype: int
+        """
+        return self._scale_target
+
+    @scale_target.setter
+    def scale_target(self, scale_target):
+        """Sets the scale_target of this V1beta1PredictorSpec.
+
+        ScaleTarget specifies the integer target value of the metric type the Autoscaler watches for. concurrency and rps targets are supported by Knative Pod Autoscaler (https://knative.dev/docs/serving/autoscaling/autoscaling-targets/).  # noqa: E501
+
+        :param scale_target: The scale_target of this V1beta1PredictorSpec.  # noqa: E501
+        :type: int
+        """
+
+        self._scale_target = scale_target
 
     @property
     def scheduler_name(self):
@@ -1307,7 +1416,7 @@ class V1beta1PredictorSpec(object):
     def termination_grace_period_seconds(self):
         """Gets the termination_grace_period_seconds of this V1beta1PredictorSpec.  # noqa: E501
 
-        Optional duration in seconds the pod needs to terminate gracefully. May be decreased in delete request. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period will be used instead. The grace period is the duration in seconds after the processes running in the pod are sent a termination signal and the time when the processes are forcibly halted with a kill signal. Set this value longer than the expected cleanup time for your process. Defaults to 30 seconds.  # noqa: E501
+        Optional duration in seconds the pod needs to terminate gracefully. May be decreased in delete request. Value must be non-negative integer. The value zero indicates stop immediately via the kill signal (no opportunity to shut down). If this value is nil, the default grace period will be used instead. The grace period is the duration in seconds after the processes running in the pod are sent a termination signal and the time when the processes are forcibly halted with a kill signal. Set this value longer than the expected cleanup time for your process. Defaults to 30 seconds.  # noqa: E501
 
         :return: The termination_grace_period_seconds of this V1beta1PredictorSpec.  # noqa: E501
         :rtype: int
@@ -1318,7 +1427,7 @@ class V1beta1PredictorSpec(object):
     def termination_grace_period_seconds(self, termination_grace_period_seconds):
         """Sets the termination_grace_period_seconds of this V1beta1PredictorSpec.
 
-        Optional duration in seconds the pod needs to terminate gracefully. May be decreased in delete request. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period will be used instead. The grace period is the duration in seconds after the processes running in the pod are sent a termination signal and the time when the processes are forcibly halted with a kill signal. Set this value longer than the expected cleanup time for your process. Defaults to 30 seconds.  # noqa: E501
+        Optional duration in seconds the pod needs to terminate gracefully. May be decreased in delete request. Value must be non-negative integer. The value zero indicates stop immediately via the kill signal (no opportunity to shut down). If this value is nil, the default grace period will be used instead. The grace period is the duration in seconds after the processes running in the pod are sent a termination signal and the time when the processes are forcibly halted with a kill signal. Set this value longer than the expected cleanup time for your process. Defaults to 30 seconds.  # noqa: E501
 
         :param termination_grace_period_seconds: The termination_grace_period_seconds of this V1beta1PredictorSpec.  # noqa: E501
         :type: int

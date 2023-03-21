@@ -1,6 +1,6 @@
 # Using ART to get adversarial examples for MNIST classifications
 
-This is an example to show how adversarially modified inputs can trick models to predict incorrectly to highlight model vulnerability to adversarial attacks. It is using the [Adversarial Robustness Toolbox (ART)](https://adversarial-robustness-toolbox.org/) on KFServing. ART provides tools that enable developers to evaluate, defend, and verify ML models and applications against adversarial threats. Apart from giving capabilities to craft [adversarial attacks](https://github.com/Trusted-AI/adversarial-robustness-toolbox/wiki/ART-Attacks), it also provides [algorithms to defend](https://github.com/Trusted-AI/adversarial-robustness-toolbox/wiki/ART-Defences) against them.
+This is an example to show how adversarially modified inputs can trick models to predict incorrectly to highlight model vulnerability to adversarial attacks. It is using the [Adversarial Robustness Toolbox (ART)](https://adversarial-robustness-toolbox.org/) integrated with KServe. ART provides tools that enable developers to evaluate, defend, and verify ML models and applications against adversarial threats. Apart from giving capabilities to craft [adversarial attacks](https://github.com/Trusted-AI/adversarial-robustness-toolbox/wiki/ART-Attacks), it also provides [algorithms to defend](https://github.com/Trusted-AI/adversarial-robustness-toolbox/wiki/ART-Defences) against them.
 
 We will be using the MNIST dataset which is a dataset of handwritten digits and find adversarial examples which will can make the model predict a classification incorrectly, thereby showing the vulnerability of the model against adversarial attacks.
 
@@ -13,8 +13,8 @@ Then find the url.
 `kubectl get inferenceservice`
 
 ```
-NAME         URL                                               READY   DEFAULT TRAFFIC   CANARY TRAFFIC   AGE
-artserver   http://artserver.somecluster/v1/models/artserver   True    100                                40m
+NAME        URL                                    READY   PREV   LATEST   PREVROLLEDOUTREVISION   LATESTREADYREVISION                 AGE
+artserver   http://artserver.default.example.com   True           100                              artserver-predictor-default-00001   14m
 ```
 
 ## Explanation
@@ -23,7 +23,7 @@ The first step is to [determine the ingress IP and ports](../../../../../README.
 ```
 MODEL_NAME=artserver
 SERVICE_HOSTNAME=$(kubectl get inferenceservice ${MODEL_NAME} -o jsonpath='{.status.url}' | cut -d "/" -f 3)
-python query_explain.py http://${INGRESS_HOST}:${INGRESS_PORT}/v1/models/$MODEL_NAME:explain ${SERVICE_HOSTNAME}
+python query_explain.py http://${INGRESS_HOST}:${INGRESS_PORT}/v1/models/${MODEL_NAME}:explain ${SERVICE_HOSTNAME}
 ```
 
 After some time you should see a pop up containing the explanation, similar to the image below. If a pop up does not display and the message "Unable to find an adversarial example." appears then an adversarial example could not be found for the image given in a timely manner. If a pop up does display then the image on the left is the original image and the image on the right is the adversarial example. The labels above both images represent what classification the model made for each individual image.
@@ -35,8 +35,8 @@ The [Square Attack method](https://arxiv.org/abs/1912.00049) used in this exampl
 To try a different MNIST example add an integer to the end of the query between 0-9,999. The integer chosen will be the index of the image to be chosen in the MNIST dataset. Or to try a file with custom data add the file path to the end. Keep in mind that the data format must be `{"instances": [<image>, <label>]}`
 
 ```
-python query_explain.py http://${INGRESS_HOST}:${INGRESS_PORT}/v1/models/$MODEL_NAME:explain ${SERVICE_HOSTNAME} 100
-python query_explain.py http://${INGRESS_HOST}:${INGRESS_PORT}/v1/models/$MODEL_NAME:explain ${SERVICE_HOSTNAME} ./input.json
+python query_explain.py http://${INGRESS_HOST}:${INGRESS_PORT}/v1/models/${MODEL_NAME}:explain ${SERVICE_HOSTNAME} 100
+python query_explain.py http://${INGRESS_HOST}:${INGRESS_PORT}/v1/models/${MODEL_NAME}:explain ${SERVICE_HOSTNAME} ./input.json
 ```
 
 ## Stopping the Inference Service

@@ -1,3 +1,4 @@
+# Copyright 2022 The KServe Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -27,7 +28,23 @@
 from __future__ import absolute_import
 
 # import models into model package
+from kserve.models.v1alpha1_built_in_adapter import V1alpha1BuiltInAdapter
+from kserve.models.v1alpha1_cluster_serving_runtime import V1alpha1ClusterServingRuntime
+from kserve.models.v1alpha1_cluster_serving_runtime_list import V1alpha1ClusterServingRuntimeList
+from kserve.models.v1alpha1_inference_graph import V1alpha1InferenceGraph
+from kserve.models.v1alpha1_inference_graph_list import V1alpha1InferenceGraphList
+from kserve.models.v1alpha1_inference_graph_spec import V1alpha1InferenceGraphSpec
+from kserve.models.v1alpha1_inference_graph_status import V1alpha1InferenceGraphStatus
+from kserve.models.v1alpha1_inference_router import V1alpha1InferenceRouter
+from kserve.models.v1alpha1_inference_step import V1alpha1InferenceStep
+from kserve.models.v1alpha1_inference_target import V1alpha1InferenceTarget
 from kserve.models.v1alpha1_model_spec import V1alpha1ModelSpec
+from kserve.models.v1alpha1_serving_runtime import V1alpha1ServingRuntime
+from kserve.models.v1alpha1_serving_runtime_list import V1alpha1ServingRuntimeList
+from kserve.models.v1alpha1_serving_runtime_pod_spec import V1alpha1ServingRuntimePodSpec
+from kserve.models.v1alpha1_serving_runtime_spec import V1alpha1ServingRuntimeSpec
+from kserve.models.v1alpha1_storage_helper import V1alpha1StorageHelper
+from kserve.models.v1alpha1_supported_model_format import V1alpha1SupportedModelFormat
 from kserve.models.v1alpha1_trained_model import V1alpha1TrainedModel
 from kserve.models.v1alpha1_trained_model_list import V1alpha1TrainedModelList
 from kserve.models.v1alpha1_trained_model_spec import V1alpha1TrainedModelSpec
@@ -40,10 +57,12 @@ from kserve.models.v1beta1_component_status_spec import V1beta1ComponentStatusSp
 from kserve.models.v1beta1_custom_explainer import V1beta1CustomExplainer
 from kserve.models.v1beta1_custom_predictor import V1beta1CustomPredictor
 from kserve.models.v1beta1_custom_transformer import V1beta1CustomTransformer
+from kserve.models.v1beta1_deploy_config import V1beta1DeployConfig
 from kserve.models.v1beta1_explainer_config import V1beta1ExplainerConfig
 from kserve.models.v1beta1_explainer_extension_spec import V1beta1ExplainerExtensionSpec
 from kserve.models.v1beta1_explainer_spec import V1beta1ExplainerSpec
 from kserve.models.v1beta1_explainers_config import V1beta1ExplainersConfig
+from kserve.models.v1beta1_failure_info import V1beta1FailureInfo
 from kserve.models.v1beta1_inference_service import V1beta1InferenceService
 from kserve.models.v1beta1_inference_service_list import V1beta1InferenceServiceList
 from kserve.models.v1beta1_inference_service_spec import V1beta1InferenceServiceSpec
@@ -52,20 +71,21 @@ from kserve.models.v1beta1_inference_services_config import V1beta1InferenceServ
 from kserve.models.v1beta1_ingress_config import V1beta1IngressConfig
 from kserve.models.v1beta1_light_gbm_spec import V1beta1LightGBMSpec
 from kserve.models.v1beta1_logger_spec import V1beta1LoggerSpec
+from kserve.models.v1beta1_model_copies import V1beta1ModelCopies
+from kserve.models.v1beta1_model_format import V1beta1ModelFormat
+from kserve.models.v1beta1_model_revision_states import V1beta1ModelRevisionStates
+from kserve.models.v1beta1_model_spec import V1beta1ModelSpec
+from kserve.models.v1beta1_model_status import V1beta1ModelStatus
 from kserve.models.v1beta1_onnx_runtime_spec import V1beta1ONNXRuntimeSpec
 from kserve.models.v1beta1_pmml_spec import V1beta1PMMLSpec
 from kserve.models.v1beta1_paddle_server_spec import V1beta1PaddleServerSpec
 from kserve.models.v1beta1_pod_spec import V1beta1PodSpec
-from kserve.models.v1beta1_predictor_config import V1beta1PredictorConfig
 from kserve.models.v1beta1_predictor_extension_spec import V1beta1PredictorExtensionSpec
-from kserve.models.v1beta1_predictor_protocols import V1beta1PredictorProtocols
 from kserve.models.v1beta1_predictor_spec import V1beta1PredictorSpec
-from kserve.models.v1beta1_predictors_config import V1beta1PredictorsConfig
 from kserve.models.v1beta1_sk_learn_spec import V1beta1SKLearnSpec
+from kserve.models.v1beta1_storage_spec import V1beta1StorageSpec
 from kserve.models.v1beta1_tf_serving_spec import V1beta1TFServingSpec
 from kserve.models.v1beta1_torch_serve_spec import V1beta1TorchServeSpec
-from kserve.models.v1beta1_transformer_config import V1beta1TransformerConfig
 from kserve.models.v1beta1_transformer_spec import V1beta1TransformerSpec
-from kserve.models.v1beta1_transformers_config import V1beta1TransformersConfig
 from kserve.models.v1beta1_triton_spec import V1beta1TritonSpec
 from kserve.models.v1beta1_xg_boost_spec import V1beta1XGBoostSpec

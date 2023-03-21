@@ -1,3 +1,4 @@
+# Copyright 2021 The KServe Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,7 +18,7 @@ import alibi
 from alibi.api.interfaces import Explanation
 from alibi.utils.wrappers import ArgmaxTransformer
 from alibiexplainer.explainer_wrapper import ExplainerWrapper
-from typing import Callable, List, Optional
+from typing import Callable, List, Optional, Dict
 
 logging.basicConfig(level=kserve.constants.KSERVE_LOGLEVEL)
 
@@ -35,7 +36,7 @@ class AnchorImages(ExplainerWrapper):
         self.anchors_image = explainer
         self.kwargs = kwargs
 
-    def explain(self, inputs: List) -> Explanation:
+    def explain(self, inputs: List, headers: Dict[str, str] = None) -> Explanation:
         arr = np.array(inputs)
         # check if predictor returns predicted class or prediction probabilities for each class
         # if needed adjust predictor so it returns the predicted class

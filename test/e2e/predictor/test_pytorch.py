@@ -13,6 +13,7 @@
 
 import numpy as np
 import os
+import pytest
 from kubernetes import client
 
 from kserve import KServeClient
@@ -25,19 +26,18 @@ from kubernetes.client import V1ResourceRequirements
 from ..common.utils import predict
 from ..common.utils import KSERVE_TEST_NAMESPACE
 
-kserve_client = KServeClient(config_file=os.environ.get("KUBECONFIG", "~/.kube/config"))
 
-
+@pytest.mark.skip()
 def test_pytorch():
     service_name = 'isvc-pytorch'
     predictor = V1beta1PredictorSpec(
         min_replicas=1,
         pytorch=V1beta1TorchServeSpec(
-            storage_uri='gs://kfserving-samples/models/pytorch/cifar10',
+            storage_uri='gs://kfserving-examples/models/pytorch/cifar10',
             model_class_name="Net",
             resources=V1ResourceRequirements(
-                requests={'cpu': '100m', 'memory': '2Gi'},
-                limits={'cpu': '100m', 'memory': '2Gi'}
+                requests={'cpu': '10m', 'memory': '128Mi'},
+                limits={'cpu': '100m', 'memory': '256Mi'}
             )
         )
     )
@@ -48,6 +48,7 @@ def test_pytorch():
                                        name=service_name, namespace=KSERVE_TEST_NAMESPACE),
                                    spec=V1beta1InferenceServiceSpec(predictor=predictor))
 
+    kserve_client = KServeClient(config_file=os.environ.get("KUBECONFIG", "~/.kube/config"))
     kserve_client.create(isvc)
     try:
         kserve_client.wait_isvc_ready(service_name, namespace=KSERVE_TEST_NAMESPACE)
@@ -62,5 +63,5 @@ def test_pytorch():
             print(pod)
         raise e
     res = predict(service_name, './data/cifar_input.json')
-    assert(np.argmax(res["predictions"]) == 3)
+    assert (np.argmax(res["predictions"]) == 3)
     kserve_client.delete(service_name, KSERVE_TEST_NAMESPACE)

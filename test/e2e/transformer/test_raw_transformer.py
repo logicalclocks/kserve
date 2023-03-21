@@ -12,9 +12,6 @@
 # limitations under the License.
 
 import os
-import json
-import requests
-import time
 import logging
 from kubernetes import client
 
@@ -28,75 +25,57 @@ from kserve import V1beta1InferenceService
 from kubernetes.client import V1ResourceRequirements
 from kubernetes.client import V1Container
 from kubernetes.client import V1EnvVar
-from ..common.utils import get_cluster_ip
+import pytest
+from ..common.utils import predict
 from ..common.utils import KSERVE_TEST_NAMESPACE
 logging.basicConfig(level=logging.INFO)
-kserve_client = KServeClient(
-    config_file=os.environ.get("KUBECONFIG", "~/.kube/config"))
 
 
+@pytest.mark.transformer
 def test_transformer():
-    service_name = 'raw'
+    service_name = 'raw-transformer'
     predictor = V1beta1PredictorSpec(
         min_replicas=1,
         pytorch=V1beta1TorchServeSpec(
-            storage_uri='gs://kfserving-examples/models/torchserve/image_classifier',
+            storage_uri='gs://kfserving-examples/models/torchserve/image_classifier/v1',
             resources=V1ResourceRequirements(
-                requests={'cpu': '100m', 'memory': '2Gi'},
-                limits={'cpu': '100m', 'memory': '2Gi'}
+                requests={"cpu": "50m", "memory": "128Mi"},
+                limits={'cpu': '1', 'memory': '1Gi'}
             )
         ),
     )
     transformer = V1beta1TransformerSpec(
         min_replicas=1,
         containers=[V1Container(
-            image='kserve/torchserve-image-transformer:latest',
+            image='kserve/image-transformer:'
+                  + os.environ.get("GITHUB_SHA"),
             name='kserve-container',
             resources=V1ResourceRequirements(
-                requests={'cpu': '100m', 'memory': '2Gi'},
-                limits={'cpu': '100m', 'memory': '2Gi'}),
-            env=[V1EnvVar(name="STORAGE_URI", value="gs://kfserving-examples/models/torchserve/image_classifier")])]
+                requests={"cpu": "50m", "memory": "128Mi"},
+                limits={'cpu': '100m', 'memory': '1Gi'}),
+            args=["--model_name", "mnist"],
+            env=[V1EnvVar(name="STORAGE_URI", value="gs://kfserving-examples/models/torchserve/image_classifier/v1")])]
     )
 
     annotations = dict()
     annotations['serving.kserve.io/deploymentMode'] = 'RawDeployment'
-    annotations['kubernetes.io/ingress.class'] = 'istio'
     isvc = V1beta1InferenceService(api_version=constants.KSERVE_V1BETA1,
                                    kind=constants.KSERVE_KIND,
                                    metadata=client.V1ObjectMeta(
                                        name=service_name, namespace=KSERVE_TEST_NAMESPACE, annotations=annotations),
                                    spec=V1beta1InferenceServiceSpec(predictor=predictor, transformer=transformer))
 
+    kserve_client = KServeClient(config_file=os.environ.get("KUBECONFIG", "~/.kube/config"))
     kserve_client.create(isvc)
     try:
         kserve_client.wait_isvc_ready(
             service_name, namespace=KSERVE_TEST_NAMESPACE)
     except RuntimeError as e:
+        print(kserve_client.api_instance.get_namespaced_custom_object("serving.knative.dev", "v1",
+                                                                      KSERVE_TEST_NAMESPACE,
+                                                                      "services", service_name + "-predictor-default"))
         raise e
 
-    time.sleep(30)
-
-    isvc = kserve_client.get(
-        service_name,
-        namespace=KSERVE_TEST_NAMESPACE,
-    )
-
-    cluster_ip = get_cluster_ip()
-    logging.info("clusterip = %s", cluster_ip)
-
-    host = isvc["status"]["url"]
-    host = host[host.rfind('/')+1:]
-    url = 'http://{}/v1/models/mnist:predict'.format(cluster_ip)
-    logging.info("url = %s ", url)
-    headers = {"Host": host}
-    data_str = '{"instances": [{"data": "iVBORw0KGgoAAAANSUhEUgAAABwAAAAcCAAAAABXZoBIAAAAw0lE\
-    QVR4nGNgGFggVVj4/y8Q2GOR83n+58/fP0DwcSqmpNN7oOTJw6f+/H2pjUU2JCSEk0EWqN0cl828e/FIxvz9/9cCh1\
-        zS5z9/G9mwyzl/+PNnKQ45nyNAr9ThMHQ/UG4tDofuB4bQIhz6fIBenMWJQ+7Vn7+zeLCbKXv6z59NOPQVgsIcW\
-            4QA9YFi6wNQLrKwsBebW/68DJ388Nun5XFocrqvIFH59+XhBAxThTfeB0r+vP/QHbuDCgr2JmOXoSsAAKK7b\
-                U3vISS4AAAAAElFTkSuQmCC", "target": 0}]}'
-    res = requests.post(url, data_str, headers=headers)
-    logging.info("res.text = %s", res.text)
-    preds = json.loads(res.content.decode("utf-8"))
-    assert(preds["predictions"] == [2])
-
+    res = predict(service_name, "./data/transformer.json", model_name="mnist")
+    assert (res.get("predictions")[0] == 2)
     kserve_client.delete(service_name, KSERVE_TEST_NAMESPACE)

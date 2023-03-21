@@ -1,4 +1,5 @@
 /*
+Copyright 2021 The KServe Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,6 +20,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+
+	"k8s.io/apimachinery/pkg/util/intstr"
 
 	"github.com/kserve/kserve/pkg/apis/serving/v1beta1"
 	"github.com/kserve/kserve/pkg/constants"
@@ -62,17 +65,17 @@ type AgentInjector struct {
 	batcherConfig     *BatcherConfig
 }
 
+// TODO agent config
 func getAgentConfigs(configMap *v1.ConfigMap) (*AgentConfig, error) {
-
 	agentConfig := &AgentConfig{}
 	if agentConfigValue, ok := configMap.Data[constants.AgentConfigMapKeyName]; ok {
 		err := json.Unmarshal([]byte(agentConfigValue), &agentConfig)
 		if err != nil {
-			panic(fmt.Errorf("Unable to unmarshall agent json string due to %v ", err))
+			panic(fmt.Errorf("unable to unmarshall agent json string due to %v", err))
 		}
 	}
 
-	//Ensure that we set proper values for CPU/Memory Limit/Request
+	//Ensure that we set proper values
 	resourceDefaults := []string{agentConfig.MemoryRequest,
 		agentConfig.MemoryLimit,
 		agentConfig.CpuRequest,
@@ -80,7 +83,7 @@ func getAgentConfigs(configMap *v1.ConfigMap) (*AgentConfig, error) {
 	for _, key := range resourceDefaults {
 		_, err := resource.ParseQuantity(key)
 		if err != nil {
-			return agentConfig, fmt.Errorf("Failed to parse resource configuration for %q: %q",
+			return agentConfig, fmt.Errorf("failed to parse resource configuration for %q: %s",
 				constants.AgentConfigMapKeyName, err.Error())
 		}
 	}
@@ -196,10 +199,40 @@ func (ag *AgentInjector) InjectAgent(pod *v1.Pod) error {
 		args = append(args, loggerArgs...)
 	}
 
-	queueProxyEnvs := []v1.EnvVar{}
+	var queueProxyEnvs []v1.EnvVar
+	var agentEnvs []v1.EnvVar
+	queueProxyAvailable := false
 	for _, container := range pod.Spec.Containers {
 		if container.Name == "queue-proxy" {
+			agentEnvs = make([]v1.EnvVar, len(container.Env))
+			copy(agentEnvs, container.Env)
 			queueProxyEnvs = container.Env
+			queueProxyAvailable = true
+		}
+
+		if container.Name == "kserve-container" {
+
+			containerPort := constants.InferenceServiceDefaultHttpPort
+			if len(container.Ports) > 0 {
+				containerPort = fmt.Sprint((container.Ports[0].ContainerPort))
+			}
+
+			args = append(args, "--component-port", containerPort)
+		}
+	}
+
+	if !queueProxyAvailable {
+		readinessProbeJson, err := json.Marshal(pod.Spec.Containers[0].ReadinessProbe)
+		if err != nil {
+			return err
+		}
+		agentEnvs = append(agentEnvs, v1.EnvVar{Name: "SERVING_READINESS_PROBE", Value: string(readinessProbeJson)})
+	} else {
+		for i, envVar := range queueProxyEnvs {
+			if envVar.Name == "USER_PORT" {
+				envVar.Value = constants.InferenceServiceDefaultAgentPortStr
+				queueProxyEnvs[i] = envVar
+			}
 		}
 	}
 
@@ -220,22 +253,31 @@ func (ag *AgentInjector) InjectAgent(pod *v1.Pod) error {
 				v1.ResourceMemory: resource.MustParse(ag.agentConfig.MemoryRequest),
 			},
 		},
+		Ports: []v1.ContainerPort{
+			{
+				Name:          "agent-port",
+				ContainerPort: constants.InferenceServiceDefaultAgentPort,
+				Protocol:      "TCP",
+			},
+		},
 		SecurityContext: securityContext,
-		Env:             queueProxyEnvs,
-	}
-	readinessProbe := &v1.Probe{
-		Handler: v1.Handler{
-			Exec: &v1.ExecAction{
-				Command: []string{
-					"/ko-app/agent",
-					"--probe-period",
-					"0",
+		Env:             agentEnvs,
+		ReadinessProbe: &v1.Probe{
+			ProbeHandler: v1.ProbeHandler{
+				HTTPGet: &v1.HTTPGetAction{
+					HTTPHeaders: []v1.HTTPHeader{
+						{
+							Name:  "K-Network-Probe",
+							Value: "queue",
+						},
+					},
+					Port:   intstr.FromInt(constants.InferenceServiceDefaultAgentPort),
+					Path:   "/",
+					Scheme: "HTTP",
 				},
 			},
 		},
-		TimeoutSeconds: 10,
 	}
-	agentContainer.ReadinessProbe = readinessProbe
 
 	// Inject credentials
 	if err := ag.credentialBuilder.CreateSecretVolumeAndEnv(

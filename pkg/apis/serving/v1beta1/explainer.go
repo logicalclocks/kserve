@@ -1,4 +1,5 @@
 /*
+Copyright 2021 The KServe Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -15,7 +16,10 @@ limitations under the License.
 
 package v1beta1
 
-import v1 "k8s.io/api/core/v1"
+import (
+	"github.com/kserve/kserve/pkg/utils"
+	v1 "k8s.io/api/core/v1"
+)
 
 // ExplainerSpec defines the container spec for a model explanation server,
 // The following fields follow a "1-of" semantic. Users must specify exactly one spec.
@@ -48,9 +52,33 @@ type ExplainerExtensionSpec struct {
 	// Each framework will have different defaults that are populated in the underlying container spec.
 	// +optional
 	v1.Container `json:",inline"`
+	// Storage Spec for model location
+	// +optional
+	Storage *StorageSpec `json:"storage,omitempty"`
 }
 
 var _ Component = &ExplainerSpec{}
+
+// Validate returns an error if invalid
+func (e *ExplainerExtensionSpec) Validate() error {
+	return utils.FirstNonNilError([]error{
+		validateStorageURI(e.GetStorageUri()),
+		validateStorageSpec(e.GetStorageSpec(), e.GetStorageUri()),
+	})
+}
+
+// GetStorageUri returns the predictor storage Uri
+func (e *ExplainerExtensionSpec) GetStorageUri() *string {
+	if e.StorageURI != "" {
+		return &e.StorageURI
+	}
+	return nil
+}
+
+// GetStorageSpec returns the predictor storage spec object
+func (e *ExplainerExtensionSpec) GetStorageSpec() *StorageSpec {
+	return e.Storage
+}
 
 // GetImplementations returns the implementations for the component
 func (s *ExplainerSpec) GetImplementations() []ComponentImplementation {

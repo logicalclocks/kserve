@@ -1,8 +1,12 @@
 /*
+Copyright 2021 The KServe Authors.
+
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
+
     http://www.apache.org/licenses/LICENSE-2.0
+
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -68,26 +72,41 @@ func createKnativeService(componentMeta metav1.ObjectMeta,
 	annotations := componentMeta.GetAnnotations()
 
 	if componentExtension.MinReplicas == nil {
-		annotations[autoscaling.MinScaleAnnotationKey] = fmt.Sprint(constants.DefaultMinReplicas)
+		annotations[constants.MinScaleAnnotationKey] = fmt.Sprint(constants.DefaultMinReplicas)
 	} else {
-		annotations[autoscaling.MinScaleAnnotationKey] = fmt.Sprint(*componentExtension.MinReplicas)
+		annotations[constants.MinScaleAnnotationKey] = fmt.Sprint(*componentExtension.MinReplicas)
 	}
 
 	if componentExtension.MaxReplicas != 0 {
-		annotations[autoscaling.MaxScaleAnnotationKey] = fmt.Sprint(componentExtension.MaxReplicas)
+		annotations[constants.MaxScaleAnnotationKey] = fmt.Sprint(componentExtension.MaxReplicas)
 	}
 
 	// User can pass down scaling class annotation to overwrite the default scaling KPA
 	if _, ok := annotations[autoscaling.ClassAnnotationKey]; !ok {
 		annotations[autoscaling.ClassAnnotationKey] = autoscaling.KPA
 	}
-	lastRolledoutRevision := componentStatus.LatestRolledoutRevision
-	// This is to handle case when the latest ready revision is rolled out with 100% and then rolled back
-	// so here we need to get the revision that is previously rolled out with 100%
-	if componentStatus.LatestRolledoutRevision == componentStatus.LatestReadyRevision &&
-		componentExtension.CanaryTrafficPercent != nil && *componentExtension.CanaryTrafficPercent < 100 {
-		lastRolledoutRevision = componentStatus.PreviousRolledoutRevision
+
+	if componentExtension.ScaleTarget != nil {
+		annotations[autoscaling.TargetAnnotationKey] = fmt.Sprint(*componentExtension.ScaleTarget)
 	}
+
+	if componentExtension.ScaleMetric != nil {
+		annotations[autoscaling.MetricAnnotationKey] = fmt.Sprint(*componentExtension.ScaleMetric)
+	}
+
+	// ksvc metadata.annotations
+	// rollout-duration must be put under metadata.annotations
+	ksvcAnnotations := make(map[string]string)
+	if value, ok := annotations[constants.RollOutDurationAnnotationKey]; ok {
+		ksvcAnnotations[constants.RollOutDurationAnnotationKey] = value
+		delete(annotations, constants.RollOutDurationAnnotationKey)
+	}
+
+	lastRolledoutRevision := componentStatus.LatestRolledoutRevision
+
+	// Log component status and canary traffic percent
+	log.Info("revision status:", "LatestRolledoutRevision", componentStatus.LatestRolledoutRevision, "LatestReadyRevision", componentStatus.LatestReadyRevision, "LatestCreatedRevision", componentStatus.LatestCreatedRevision, "PreviousRolledoutRevision", componentStatus.PreviousRolledoutRevision, "CanaryTrafficPercent", componentExtension.CanaryTrafficPercent)
+
 	trafficTargets := []knservingv1.TrafficTarget{}
 	// Split traffic when canary traffic percent is specified
 	if componentExtension.CanaryTrafficPercent != nil && lastRolledoutRevision != "" {
@@ -124,11 +143,13 @@ func createKnativeService(componentMeta metav1.ObjectMeta,
 	labels := utils.Filter(componentMeta.Labels, func(key string) bool {
 		return !utils.Includes(constants.RevisionTemplateLabelDisallowedList, key)
 	})
+
 	service := &knservingv1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      componentMeta.Name,
-			Namespace: componentMeta.Namespace,
-			Labels:    componentMeta.Labels,
+			Name:        componentMeta.Name,
+			Namespace:   componentMeta.Namespace,
+			Labels:      componentMeta.Labels,
+			Annotations: ksvcAnnotations,
 		},
 		Spec: knservingv1.ServiceSpec{
 			ConfigurationSpec: knservingv1.ConfigurationSpec{

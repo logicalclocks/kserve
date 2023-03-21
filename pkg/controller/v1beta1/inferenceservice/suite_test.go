@@ -1,8 +1,12 @@
 /*
+Copyright 2021 The KServe Authors.
+
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
+
     http://www.apache.org/licenses/LICENSE-2.0
+
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -26,14 +30,13 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/kserve/kserve/pkg/apis/serving/v1beta1"
-	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	knservingv1 "knative.dev/serving/pkg/apis/serving/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
-	"sigs.k8s.io/controller-runtime/pkg/envtest/printer"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 )
@@ -41,21 +44,23 @@ import (
 // These tests use Ginkgo (BDD-style Go testing framework). Refer to
 // http://onsi.github.io/ginkgo/ to learn more about Ginkgo.
 
-var cfg *rest.Config
-var k8sClient client.Client
-var testEnv *envtest.Environment
+var (
+	cfg       *rest.Config
+	k8sClient client.Client
+	testEnv   *envtest.Environment
+	cancel    context.CancelFunc
+	ctx       context.Context
+)
 
 func TestV1beta1APIs(t *testing.T) {
 	RegisterFailHandler(Fail)
 
-	RunSpecsWithDefaultAndCustomReporters(t,
-		"v1beta1 Controller Suite",
-		[]Reporter{printer.NewlineReporter{}})
+	RunSpecs(t, "v1beta1 Controller Suite")
 }
 
-var _ = BeforeSuite(func(done Done) {
+var _ = BeforeSuite(func() {
 	logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
-
+	ctx, cancel = context.WithCancel(context.TODO())
 	By("bootstrapping test environment")
 	testEnv = pkgtest.SetupEnvTest()
 	cfg, err := testEnv.Start()
@@ -90,26 +95,33 @@ var _ = BeforeSuite(func(done Done) {
 	Expect(err).ToNot(HaveOccurred())
 
 	deployConfig := &v1beta1.DeployConfig{DefaultDeploymentMode: "Serverless"}
+	ingressConfig := &v1beta1.IngressConfig{
+		IngressGateway:          constants.KnativeIngressGateway,
+		IngressServiceName:      "someIngressServiceName",
+		LocalGateway:            constants.KnativeLocalGateway,
+		LocalGatewayServiceName: "knative-local-gateway.istio-system.svc.cluster.local",
+		DisableIstioVirtualHost: false,
+	}
 	err = (&InferenceServiceReconciler{
 		Client:   k8sClient,
 		Scheme:   k8sClient.Scheme(),
 		Log:      ctrl.Log.WithName("V1beta1InferenceServiceController"),
 		Recorder: k8sManager.GetEventRecorderFor("V1beta1InferenceServiceController"),
-	}).SetupWithManager(k8sManager, deployConfig)
+	}).SetupWithManager(k8sManager, deployConfig, ingressConfig)
 	Expect(err).ToNot(HaveOccurred())
 
 	go func() {
 		defer GinkgoRecover()
-		err = k8sManager.Start(ctrl.SetupSignalHandler())
+		err = k8sManager.Start(ctx)
 		Expect(err).ToNot(HaveOccurred())
 	}()
 
 	k8sClient = k8sManager.GetClient()
 	Expect(k8sClient).ToNot(BeNil())
-	close(done)
-}, 60)
+})
 
 var _ = AfterSuite(func() {
+	cancel()
 	By("tearing down the test environment")
 	err := testEnv.Stop()
 	Expect(err).ToNot(HaveOccurred())

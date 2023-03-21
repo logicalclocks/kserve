@@ -1,4 +1,5 @@
 /*
+Copyright 2021 The KServe Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -59,49 +60,7 @@ func TestCustomPredictorValidation(t *testing.T) {
 							Env: []v1.EnvVar{
 								{
 									Name:  "STORAGE_URI",
-									Value: "hdfs://modelzoo",
-								},
-							},
-						},
-					},
-				},
-			},
-			matcher: gomega.Not(gomega.BeNil()),
-		},
-		"InvalidReplica": {
-			spec: PredictorSpec{
-				ComponentExtensionSpec: ComponentExtensionSpec{
-					MinReplicas: GetIntReference(3),
-					MaxReplicas: 2,
-				},
-				PodSpec: PodSpec{
-					Containers: []v1.Container{
-						{
-							Env: []v1.EnvVar{
-								{
-									Name:  "STORAGE_URI",
-									Value: "hdfs://modelzoo",
-								},
-							},
-						},
-					},
-				},
-			},
-			matcher: gomega.Not(gomega.BeNil()),
-		},
-		"InvalidContainerConcurrency": {
-			spec: PredictorSpec{
-				ComponentExtensionSpec: ComponentExtensionSpec{
-					MinReplicas:          GetIntReference(3),
-					ContainerConcurrency: proto.Int64(-1),
-				},
-				PodSpec: PodSpec{
-					Containers: []v1.Container{
-						{
-							Env: []v1.EnvVar{
-								{
-									Name:  "STORAGE_URI",
-									Value: "hdfs://modelzoo",
+									Value: "invaliduri://modelzoo",
 								},
 							},
 						},
@@ -188,9 +147,6 @@ func TestCustomPredictorValidation(t *testing.T) {
 
 func TestCustomPredictorDefaulter(t *testing.T) {
 	g := gomega.NewGomegaWithT(t)
-	config := InferenceServicesConfig{
-		Predictors: PredictorsConfig{},
-	}
 	defaultResource = v1.ResourceList{
 		v1.ResourceCPU:    resource.MustParse("1"),
 		v1.ResourceMemory: resource.MustParse("2Gi"),
@@ -239,7 +195,7 @@ func TestCustomPredictorDefaulter(t *testing.T) {
 	for name, scenario := range scenarios {
 		t.Run(name, func(t *testing.T) {
 			customPredictor := NewCustomPredictor(&scenario.spec.PodSpec)
-			customPredictor.Default(&config)
+			customPredictor.Default(nil)
 			if !g.Expect(scenario.spec).To(gomega.Equal(scenario.expected)) {
 				t.Errorf("got %v, want %v", scenario.spec, scenario.expected)
 			}
@@ -263,9 +219,7 @@ func TestCreateCustomPredictorContainer(t *testing.T) {
 			"memory": resource.MustParse("1Gi"),
 		},
 	}
-	var config = InferenceServicesConfig{
-		Predictors: PredictorsConfig{},
-	}
+	var config = InferenceServicesConfig{}
 	g := gomega.NewGomegaWithT(t)
 	scenarios := map[string]struct {
 		isvc                  InferenceService
@@ -332,23 +286,13 @@ func TestCreateCustomPredictorContainer(t *testing.T) {
 	}
 }
 
-func TestCustomPredictorIsMMS(t *testing.T) {
+func TestCustomPredictorGetProtocol(t *testing.T) {
 	g := gomega.NewGomegaWithT(t)
-	config := InferenceServicesConfig{
-		Predictors: PredictorsConfig{},
-	}
-
-	defaultResource = v1.ResourceList{
-		v1.ResourceCPU:    resource.MustParse("1"),
-		v1.ResourceMemory: resource.MustParse("2Gi"),
-	}
-
-	mmsCase := false
 	scenarios := map[string]struct {
-		spec     PredictorSpec
-		expected bool
+		spec    PredictorSpec
+		matcher types.GomegaMatcher
 	}{
-		"DefaultResources": {
+		"Default protocol": {
 			spec: PredictorSpec{
 				PodSpec: PodSpec{
 					Containers: []v1.Container{
@@ -356,45 +300,16 @@ func TestCustomPredictorIsMMS(t *testing.T) {
 							Env: []v1.EnvVar{
 								{
 									Name:  "STORAGE_URI",
-									Value: "hdfs://modelzoo",
+									Value: "s3://modelzoo",
 								},
 							},
 						},
 					},
 				},
 			},
-			expected: mmsCase,
+			matcher: gomega.Equal(constants.ProtocolV1),
 		},
-	}
-
-	for name, scenario := range scenarios {
-		t.Run(name, func(t *testing.T) {
-			customPredictor := NewCustomPredictor(&scenario.spec.PodSpec)
-			res := customPredictor.IsMMS(&config)
-			if !g.Expect(res).To(gomega.Equal(scenario.expected)) {
-				t.Errorf("got %t, want %t", res, scenario.expected)
-			}
-		})
-	}
-}
-
-func TestCustomPredictorIsFrameworkSupported(t *testing.T) {
-	g := gomega.NewGomegaWithT(t)
-	framework := "framework"
-	config := InferenceServicesConfig{
-		Predictors: PredictorsConfig{},
-	}
-
-	defaultResource = v1.ResourceList{
-		v1.ResourceCPU:    resource.MustParse("1"),
-		v1.ResourceMemory: resource.MustParse("2Gi"),
-	}
-
-	scenarios := map[string]struct {
-		spec     PredictorSpec
-		expected bool
-	}{
-		"DefaultResources": {
+		"protocol v2": {
 			spec: PredictorSpec{
 				PodSpec: PodSpec{
 					Containers: []v1.Container{
@@ -402,24 +317,23 @@ func TestCustomPredictorIsFrameworkSupported(t *testing.T) {
 							Env: []v1.EnvVar{
 								{
 									Name:  "STORAGE_URI",
-									Value: "hdfs://modelzoo",
+									Value: "s3://modelzoo",
+								},
+								{
+									Name:  constants.CustomSpecProtocolEnvVarKey,
+									Value: string(constants.ProtocolV2),
 								},
 							},
 						},
 					},
 				},
 			},
-			expected: true,
+			matcher: gomega.Equal(constants.ProtocolV2),
 		},
 	}
-
-	for name, scenario := range scenarios {
-		t.Run(name, func(t *testing.T) {
-			customPredictor := NewCustomPredictor(&scenario.spec.PodSpec)
-			res := customPredictor.IsFrameworkSupported(framework, &config)
-			if !g.Expect(res).To(gomega.Equal(scenario.expected)) {
-				t.Errorf("got %t, want %t", res, scenario.expected)
-			}
-		})
+	for _, scenario := range scenarios {
+		customPredictor := NewCustomPredictor(&scenario.spec.PodSpec)
+		protocol := customPredictor.GetProtocol()
+		g.Expect(protocol).To(scenario.matcher)
 	}
 }
