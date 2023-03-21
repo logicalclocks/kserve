@@ -1,3 +1,4 @@
+# Copyright 2021 The KServe Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -10,35 +11,44 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import pathlib
 
 import setuptools
 
 TESTS_REQUIRES = [
     'pytest',
-    'pytest-tornasync',
-    'mypy'
+    'pytest-xdist',
+    'pytest-cov',
+    'pytest-asyncio',
+    'mypy',
+    'portforward==0.4.0',
 ]
 
 with open('requirements.txt') as f:
     REQUIRES = f.readlines()
 
+with open(pathlib.Path(__file__).parent.parent / 'VERSION') as version_file:
+    version = version_file.read().strip()
+
 setuptools.setup(
     name='kserve',
-    version='0.7.0',
+    version=version,
     author="The KServe Authors",
     author_email='ellisbigelow@google.com, hejinchi@cn.ibm.com, dsun20@bloomberg.net',
     license="Apache License Version 2.0",
     url="https://github.com/kserve/kserve/tree/master/python/kserve",
     description="KServe Python SDK",
     long_description="Python SDK for KServe Server and Client.",
-    python_requires='>=3.6',
+    python_requires='>=3.7',
     packages=[
         'kserve',
         'kserve.api',
         'kserve.constants',
         'kserve.models',
-        'kserve.handlers',
         'kserve.utils',
+        'kserve.protocol',
+        'kserve.protocol.rest',
+        'kserve.protocol.grpc',
     ],
     package_data={'': ['requirements.txt']},
     include_package_data=True,
@@ -48,8 +58,9 @@ setuptools.setup(
         'Intended Audience :: Education',
         'Intended Audience :: Science/Research',
         'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: 3.7',
+        'Programming Language :: Python :: 3.8',
+        'Programming Language :: Python :: 3.9',
         "License :: OSI Approved :: Apache Software License",
         "Operating System :: OS Independent",
         'Topic :: Scientific/Engineering',

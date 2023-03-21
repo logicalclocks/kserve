@@ -1,3 +1,4 @@
+# Copyright 2021 The KServe Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -10,8 +11,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import pathlib
 
 from setuptools import setup, find_packages
+
+with open(pathlib.Path(__file__).parent.parent / 'VERSION') as version_file:
+    version = version_file.read().strip()
 
 tests_require = [
     'pytest',
@@ -21,7 +26,7 @@ tests_require = [
 ]
 setup(
     name='sklearnserver',
-    version='0.7.0rc0',
+    version=version,
     author_email='singhan@us.ibm.com',
     license='https://github.com/kserve/kserve/LICENSE',
     url='https://github.com/kserve/kserve/python/sklearnserver',
@@ -31,11 +36,10 @@ setup(
     python_requires='>3.7',
     packages=find_packages("sklearnserver"),
     install_requires=[
-        "kserve>=0.7.0rc0",
+        f"kserve>={version}",
         "scikit-learn == 1.1.1",
-        "joblib == 1.2.0",
-        "ray[serve] == 1.6.0",
-        "protobuf ~= 3.20.1"
+        "joblib >= 1.2.0",
+        "pandas >= 1.3.5"
     ],
     tests_require=tests_require,
     extras_require={'test': tests_require}

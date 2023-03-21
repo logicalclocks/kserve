@@ -1,4 +1,5 @@
 /*
+Copyright 2021 The KServe Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -59,35 +60,7 @@ func TestLightGBMValidation(t *testing.T) {
 			spec: PredictorSpec{
 				LightGBM: &LightGBMSpec{
 					PredictorExtensionSpec: PredictorExtensionSpec{
-						StorageURI: proto.String("hdfs://modelzoo"),
-					},
-				},
-			},
-			matcher: gomega.Not(gomega.BeNil()),
-		},
-		"InvalidReplica": {
-			spec: PredictorSpec{
-				ComponentExtensionSpec: ComponentExtensionSpec{
-					MinReplicas: GetIntReference(3),
-					MaxReplicas: 2,
-				},
-				LightGBM: &LightGBMSpec{
-					PredictorExtensionSpec: PredictorExtensionSpec{
-						StorageURI: proto.String("hdfs://modelzoo"),
-					},
-				},
-			},
-			matcher: gomega.Not(gomega.BeNil()),
-		},
-		"InvalidContainerConcurrency": {
-			spec: PredictorSpec{
-				ComponentExtensionSpec: ComponentExtensionSpec{
-					MinReplicas:          GetIntReference(3),
-					ContainerConcurrency: proto.Int64(-1),
-				},
-				LightGBM: &LightGBMSpec{
-					PredictorExtensionSpec: PredictorExtensionSpec{
-						StorageURI: proto.String("hdfs://modelzoo"),
+						StorageURI: proto.String("invaliduri://modelzoo"),
 					},
 				},
 			},
@@ -107,15 +80,6 @@ func TestLightGBMValidation(t *testing.T) {
 
 func TestLightGBMDefaulter(t *testing.T) {
 	g := gomega.NewGomegaWithT(t)
-	config := InferenceServicesConfig{
-		Predictors: PredictorsConfig{
-			LightGBM: PredictorConfig{
-				ContainerImage:      "lightgbm",
-				DefaultImageVersion: "v0.4.0",
-				MultiModelServer:    true,
-			},
-		},
-	}
 	defaultResource = v1.ResourceList{
 		v1.ResourceCPU:    resource.MustParse("1"),
 		v1.ResourceMemory: resource.MustParse("2Gi"),
@@ -124,27 +88,6 @@ func TestLightGBMDefaulter(t *testing.T) {
 		spec     PredictorSpec
 		expected PredictorSpec
 	}{
-		"DefaultRuntimeVersion": {
-			spec: PredictorSpec{
-				LightGBM: &LightGBMSpec{
-					PredictorExtensionSpec: PredictorExtensionSpec{},
-				},
-			},
-			expected: PredictorSpec{
-				LightGBM: &LightGBMSpec{
-					PredictorExtensionSpec: PredictorExtensionSpec{
-						RuntimeVersion: proto.String("v0.4.0"),
-						Container: v1.Container{
-							Name: constants.InferenceServiceContainerName,
-							Resources: v1.ResourceRequirements{
-								Requests: defaultResource,
-								Limits:   defaultResource,
-							},
-						},
-					},
-				},
-			},
-		},
 		"DefaultResources": {
 			spec: PredictorSpec{
 				LightGBM: &LightGBMSpec{
@@ -172,7 +115,7 @@ func TestLightGBMDefaulter(t *testing.T) {
 
 	for name, scenario := range scenarios {
 		t.Run(name, func(t *testing.T) {
-			scenario.spec.LightGBM.Default(&config)
+			scenario.spec.LightGBM.Default(nil)
 			if !g.Expect(scenario.spec).To(gomega.Equal(scenario.expected)) {
 				t.Errorf("got %v, want %v", scenario.spec, scenario.expected)
 			}
@@ -190,15 +133,7 @@ func TestCreateLightGBMModelServingContainer(t *testing.T) {
 			"cpu": resource.MustParse("90m"),
 		},
 	}
-	var config = InferenceServicesConfig{
-		Predictors: PredictorsConfig{
-			LightGBM: PredictorConfig{
-				ContainerImage:      "someOtherImage",
-				DefaultImageVersion: "0.1.0",
-				MultiModelServer:    true,
-			},
-		},
-	}
+	var config = InferenceServicesConfig{}
 	g := gomega.NewGomegaWithT(t)
 	scenarios := map[string]struct {
 		isvc                  InferenceService
@@ -224,15 +159,8 @@ func TestCreateLightGBMModelServingContainer(t *testing.T) {
 				},
 			},
 			expectedContainerSpec: &v1.Container{
-				Image:     "someOtherImage:0.1.0",
 				Name:      constants.InferenceServiceContainerName,
 				Resources: requestedResource,
-				Args: []string{
-					"--model_name=someName",
-					"--model_dir=/mnt/models",
-					"--http_port=8080",
-					"--nthread=1",
-				},
 			},
 		},
 		"ContainerSpecWithCustomImage": {
@@ -258,12 +186,6 @@ func TestCreateLightGBMModelServingContainer(t *testing.T) {
 				Image:     "customImage:0.1.0",
 				Name:      constants.InferenceServiceContainerName,
 				Resources: requestedResource,
-				Args: []string{
-					"--model_name=someName",
-					"--model_dir=/mnt/models",
-					"--http_port=8080",
-					"--nthread=1",
-				},
 			},
 		},
 		"ContainerSpecWithContainerConcurrency": {
@@ -289,16 +211,8 @@ func TestCreateLightGBMModelServingContainer(t *testing.T) {
 				},
 			},
 			expectedContainerSpec: &v1.Container{
-				Image:     "someOtherImage:0.1.0",
 				Name:      constants.InferenceServiceContainerName,
 				Resources: requestedResource,
-				Args: []string{
-					"--model_name=someName",
-					"--model_dir=/mnt/models",
-					"--http_port=8080",
-					"--nthread=1",
-					"--workers=1",
-				},
 			},
 		},
 		"ContainerSpecWithWorker": {
@@ -327,14 +241,9 @@ func TestCreateLightGBMModelServingContainer(t *testing.T) {
 				},
 			},
 			expectedContainerSpec: &v1.Container{
-				Image:     "someOtherImage:0.1.0",
 				Name:      constants.InferenceServiceContainerName,
 				Resources: requestedResource,
 				Args: []string{
-					"--model_name=someName",
-					"--model_dir=/mnt/models",
-					"--http_port=8080",
-					"--nthread=1",
 					"--workers=1",
 				},
 			},
@@ -352,109 +261,29 @@ func TestCreateLightGBMModelServingContainer(t *testing.T) {
 	}
 }
 
-func TestLightGBMIsMMS(t *testing.T) {
+func TestLightGBMGetProtocol(t *testing.T) {
 	g := gomega.NewGomegaWithT(t)
-	multiModelServerCases := [2]bool{true, false}
-
-	for _, mmsCase := range multiModelServerCases {
-		config := InferenceServicesConfig{
-			Predictors: PredictorsConfig{
-				LightGBM: PredictorConfig{
-					ContainerImage:      "lightgbm",
-					DefaultImageVersion: "v0.4.0",
-					MultiModelServer:    mmsCase,
-				},
-			},
-		}
-		defaultResource = v1.ResourceList{
-			v1.ResourceCPU:    resource.MustParse("1"),
-			v1.ResourceMemory: resource.MustParse("2Gi"),
-		}
-		scenarios := map[string]struct {
-			spec     PredictorSpec
-			expected bool
-		}{
-			"DefaultRuntimeVersion": {
-				spec: PredictorSpec{
-					LightGBM: &LightGBMSpec{
-						PredictorExtensionSpec: PredictorExtensionSpec{},
-					},
-				},
-				expected: mmsCase,
-			},
-			"DefaultResources": {
-				spec: PredictorSpec{
-					LightGBM: &LightGBMSpec{
-						PredictorExtensionSpec: PredictorExtensionSpec{
-							RuntimeVersion: proto.String("v0.3.0"),
-						},
-					},
-				},
-				expected: mmsCase,
-			},
-		}
-
-		for name, scenario := range scenarios {
-			t.Run(name, func(t *testing.T) {
-				scenario.spec.LightGBM.Default(&config)
-				res := scenario.spec.LightGBM.IsMMS(&config)
-				if !g.Expect(res).To(gomega.Equal(scenario.expected)) {
-					t.Errorf("got %t, want %t", res, scenario.expected)
-				}
-			})
-		}
-	}
-}
-
-func TestLightGBMIsFrameworkSupported(t *testing.T) {
-	g := gomega.NewGomegaWithT(t)
-	lightbgm := "lightbgm"
-	unsupportedFramework := "framework"
-	config := InferenceServicesConfig{
-		Predictors: PredictorsConfig{
-			LightGBM: PredictorConfig{
-				ContainerImage:      "lightgbm",
-				DefaultImageVersion: "v0.4.0",
-				SupportedFrameworks: []string{"lightbgm"},
-			},
-		},
-	}
-	defaultResource = v1.ResourceList{
-		v1.ResourceCPU:    resource.MustParse("1"),
-		v1.ResourceMemory: resource.MustParse("2Gi"),
-	}
+	config := InferenceServicesConfig{}
 	scenarios := map[string]struct {
-		spec      PredictorSpec
-		framework string
-		expected  bool
+		spec    PredictorSpec
+		matcher types.GomegaMatcher
 	}{
-		"SupportedFramework": {
+		"DefaultProtocol": {
 			spec: PredictorSpec{
 				LightGBM: &LightGBMSpec{
-					PredictorExtensionSpec: PredictorExtensionSpec{},
+					PredictorExtensionSpec: PredictorExtensionSpec{
+						StorageURI: proto.String("s3://modelzoo"),
+					},
 				},
 			},
-			framework: lightbgm,
-			expected:  true,
-		},
-		"UnsupportedFramework": {
-			spec: PredictorSpec{
-				LightGBM: &LightGBMSpec{
-					PredictorExtensionSpec: PredictorExtensionSpec{},
-				},
-			},
-			framework: unsupportedFramework,
-			expected:  false,
+			matcher: gomega.Equal(constants.ProtocolV1),
 		},
 	}
-
 	for name, scenario := range scenarios {
 		t.Run(name, func(t *testing.T) {
 			scenario.spec.LightGBM.Default(&config)
-			res := scenario.spec.LightGBM.IsFrameworkSupported(scenario.framework, &config)
-			if !g.Expect(res).To(gomega.Equal(scenario.expected)) {
-				t.Errorf("got %t, want %t", res, scenario.expected)
-			}
+			protocol := scenario.spec.LightGBM.GetProtocol()
+			g.Expect(protocol).To(scenario.matcher)
 		})
 	}
 }

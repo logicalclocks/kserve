@@ -1,4 +1,5 @@
 /*
+Copyright 2021 The KServe Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -94,7 +95,7 @@ func (s *S3ObjectDownloader) GetAllObjects(s3Svc s3iface.S3API) ([]s3manager.Bat
 		}
 		subObjectKey := strings.TrimPrefix(*object.Key, s.Prefix)
 		fileName := filepath.Join(s.ModelDir, s.ModelName, subObjectKey)
-		
+
 		if FileExists(fileName) {
 			// File got corrupted or is mid-download :(
 			// TODO: Figure out if we can maybe continue?

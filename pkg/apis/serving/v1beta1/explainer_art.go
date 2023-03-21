@@ -1,4 +1,5 @@
 /*
+Copyright 2021 The KServe Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -43,13 +44,6 @@ type ARTExplainerSpec struct {
 
 var _ ComponentImplementation = &ARTExplainerSpec{}
 
-func (s *ARTExplainerSpec) GetStorageUri() *string {
-	if s.StorageURI == "" {
-		return nil
-	}
-	return &s.StorageURI
-}
-
 func (s *ARTExplainerSpec) GetResourceRequirements() *v1.ResourceRequirements {
 	// return the ResourceRequirements value if set on the spec
 	return &s.Resources
@@ -87,12 +81,13 @@ func (s *ARTExplainerSpec) GetContainer(metadata metav1.ObjectMeta, extensions *
 		args = append(args, s.Config[k])
 	}
 	args = append(args, s.Args...)
-	return &v1.Container{
-		Image:     config.Explainers.ARTExplainer.ContainerImage + ":" + *s.RuntimeVersion,
-		Name:      constants.InferenceServiceContainerName,
-		Resources: s.Resources,
-		Args:      args,
+
+	if s.Container.Image == "" {
+		s.Container.Image = config.Explainers.ARTExplainer.ContainerImage + ":" + *s.RuntimeVersion
 	}
+	s.Container.Name = constants.InferenceServiceContainerName
+	s.Container.Args = append(args, s.Container.Args...)
+	return &s.Container
 }
 
 func (s *ARTExplainerSpec) Default(config *InferenceServicesConfig) {
@@ -101,13 +96,6 @@ func (s *ARTExplainerSpec) Default(config *InferenceServicesConfig) {
 		s.RuntimeVersion = proto.String(config.Explainers.ARTExplainer.DefaultImageVersion)
 	}
 	setResourceRequirementDefaults(&s.Resources)
-}
-
-// Validate the spec
-func (s *ARTExplainerSpec) Validate() error {
-	return utils.FirstNonNilError([]error{
-		validateStorageURI(s.GetStorageUri()),
-	})
 }
 
 func (s *ARTExplainerSpec) GetProtocol() constants.InferenceServiceProtocol {

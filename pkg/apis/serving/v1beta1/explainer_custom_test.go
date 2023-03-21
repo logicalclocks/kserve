@@ -1,4 +1,5 @@
 /*
+Copyright 2021 The KServe Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -62,49 +63,7 @@ func TestCustomExplainerValidation(t *testing.T) {
 							Env: []v1.EnvVar{
 								{
 									Name:  "STORAGE_URI",
-									Value: "hdfs://modelzoo",
-								},
-							},
-						},
-					},
-				},
-			},
-			matcher: gomega.Not(gomega.BeNil()),
-		},
-		"InvalidReplica": {
-			spec: ExplainerSpec{
-				ComponentExtensionSpec: ComponentExtensionSpec{
-					MinReplicas: GetIntReference(3),
-					MaxReplicas: 2,
-				},
-				PodSpec: PodSpec{
-					Containers: []v1.Container{
-						{
-							Env: []v1.EnvVar{
-								{
-									Name:  "STORAGE_URI",
-									Value: "hdfs://modelzoo",
-								},
-							},
-						},
-					},
-				},
-			},
-			matcher: gomega.Not(gomega.BeNil()),
-		},
-		"InvalidContainerConcurrency": {
-			spec: ExplainerSpec{
-				ComponentExtensionSpec: ComponentExtensionSpec{
-					MinReplicas:          GetIntReference(3),
-					ContainerConcurrency: proto.Int64(-1),
-				},
-				PodSpec: PodSpec{
-					Containers: []v1.Container{
-						{
-							Env: []v1.EnvVar{
-								{
-									Name:  "STORAGE_URI",
-									Value: "hdfs://modelzoo",
+									Value: "invaliduri://modelzoo",
 								},
 							},
 						},
@@ -204,9 +163,7 @@ func TestCreateCustomExplainerContainer(t *testing.T) {
 			"memory": resource.MustParse("1Gi"),
 		},
 	}
-	var config = InferenceServicesConfig{
-		Transformers: TransformersConfig{},
-	}
+	var config = InferenceServicesConfig{}
 	g := gomega.NewGomegaWithT(t)
 	scenarios := map[string]struct {
 		isvc                  InferenceService

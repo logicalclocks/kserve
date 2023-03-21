@@ -1,3 +1,4 @@
+# Copyright 2021 The KServe Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,7 +14,14 @@
 
 import os
 import sys
+import uuid
+from typing import Dict, Union
+
 import psutil
+
+from cloudevents.conversion import to_binary, to_structured
+from cloudevents.http import CloudEvent
+from grpc import ServicerContext
 
 
 def is_running_in_k8s():
@@ -31,10 +39,12 @@ def get_default_target_namespace():
     return get_current_k8s_namespace()
 
 
-def set_isvc_namespace(inferenceservice):
-    isvc_namespace = inferenceservice.metadata.namespace
-    namespace = isvc_namespace or get_default_target_namespace()
-    return namespace
+def get_isvc_namespace(inferenceservice):
+    return inferenceservice.metadata.namespace or get_default_target_namespace()
+
+
+def get_ig_namespace(inferencegraph):
+    return inferencegraph.metadata.namespace or get_default_target_namespace()
 
 
 def cpu_count():
@@ -68,3 +78,58 @@ def cpu_count():
             pass
 
     return count
+
+
+def is_structured_cloudevent(body: Dict) -> bool:
+    """Returns True if the JSON request body resembles a structured CloudEvent"""
+    return "time" in body \
+           and "type" in body \
+           and "source" in body \
+           and "id" in body \
+           and "specversion" in body \
+           and "data" in body
+
+
+def create_response_cloudevent(model_name: str, body: Union[Dict, CloudEvent], response: Dict,
+                               binary_event=False) -> tuple:
+    ce_attributes = {}
+
+    if os.getenv("CE_MERGE", "false").lower() == "true":
+        if binary_event:
+            ce_attributes = body._attributes
+            if "datacontenttype" in ce_attributes:  # Optional field so must check
+                del ce_attributes["datacontenttype"]
+        else:
+            ce_attributes = body
+            del ce_attributes["data"]
+
+        # Remove these fields so we generate new ones
+        del ce_attributes["id"]
+        del ce_attributes["time"]
+
+    ce_attributes["type"] = os.getenv("CE_TYPE", "io.kserve.inference.response")
+    ce_attributes["source"] = os.getenv("CE_SOURCE", f"io.kserve.inference.{model_name}")
+
+    event = CloudEvent(ce_attributes, response)
+
+    if binary_event:
+        event_headers, event_body = to_binary(event)
+    else:
+        event_headers, event_body = to_structured(event)
+
+    return event_headers, event_body
+
+
+def generate_uuid() -> str:
+    return str(uuid.uuid4())
+
+
+def to_headers(context: ServicerContext) -> Dict[str, str]:
+    metadata = context.invocation_metadata()
+    if hasattr(context, "trailing_metadata"):
+        metadata += context.trailing_metadata()
+    headers = {}
+    for metadatum in metadata:
+        headers[metadatum.key] = metadatum.value
+
+    return headers

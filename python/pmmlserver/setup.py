@@ -1,3 +1,4 @@
+# Copyright 2021 The KServe Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -10,8 +11,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import pathlib
 
 from setuptools import setup, find_packages
+
+with open(pathlib.Path(__file__).parent.parent / 'VERSION') as version_file:
+    version = version_file.read().strip()
 
 tests_require = [
     'pytest',
@@ -21,7 +26,7 @@ tests_require = [
 ]
 setup(
     name='pmmlserver',
-    version='0.7.0rc0',
+    version=version,
     author_email='anyisalin@gmail.com',
     license='https://github.com/kserve/kserve/LICENSE',
     url='https://github.com/kserve/kserve/python/pmmlserver',
@@ -31,7 +36,7 @@ setup(
     python_requires='>3.4',
     packages=find_packages("pmmlserver"),
     install_requires=[
-        "kserve>=0.7.0rc0",
+        "kserve>=0.7.0",
         "jpmml-evaluator==0.5.1",
     ],
     tests_require=tests_require,

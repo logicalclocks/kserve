@@ -1,3 +1,4 @@
+# Copyright 2021 The KServe Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -10,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import pathlib
 
 from setuptools import setup, find_packages
 
@@ -20,9 +22,12 @@ tests_require = [
     'mypy'
 ]
 
+with open(pathlib.Path(__file__).parent.parent / 'VERSION') as version_file:
+    version = version_file.read().strip()
+
 setup(
     name='lgbserver',
-    version='0.7.0rc0',
+    version=version,
     author_email='linyiming@ainnovation.com',
     license='../../LICENSE.txt',
     url='https://github.com/kserve/kserve/python/lgbserver',
@@ -32,11 +37,10 @@ setup(
     python_requires='>3.4',
     packages=find_packages("lgbserver"),
     install_requires=[
-        "kserve>=0.7.0rc0",
-        "lightgbm == 2.3.1",
-        "pandas == 0.25.3",
+        f"kserve>={version}",
+        "lightgbm == 3.3.2",
+        "pandas == 1.3.5",
         "argparse >= 1.4.0",
-        "numpy == 1.19.5",
     ],
     tests_require=tests_require,
     extras_require={'test': tests_require}

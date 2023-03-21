@@ -1,3 +1,4 @@
+# Copyright 2021 The KServe Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,11 +16,10 @@ from unittest.mock import patch
 
 from kubernetes import client
 
-from kserve import V1alpha2EndpointSpec
-from kserve import V1alpha2PredictorSpec
-from kserve import V1alpha2TensorflowSpec
-from kserve import V1alpha2InferenceServiceSpec
-from kserve import V1alpha2InferenceService
+from kserve import V1beta1PredictorSpec
+from kserve import V1beta1TFServingSpec
+from kserve import V1beta1InferenceServiceSpec
+from kserve import V1beta1InferenceService
 from kserve import KServeClient
 
 kserve_client = KServeClient(config_file='./kserve/test/kubeconfig')
@@ -27,18 +27,16 @@ kserve_client = KServeClient(config_file='./kserve/test/kubeconfig')
 mocked_unit_result = \
     '''
 {
-    "api_version": "serving.kserve.io/v1alpha2",
+    "api_version": "serving.kserve.io/v1beta1",
     "kind": "InferenceService",
     "metadata": {
         "name": "flower-sample",
         "namespace": "kubeflow"
     },
     "spec": {
-        "default": {
-            "predictor": {
-                "tensorflow": {
-                    "storage_uri": "gs://kfserving-samples/models/tensorflow/flowers"
-                }
+        "predictor": {
+            "tensorflow": {
+                "storage_uri": "gs://kfserving-samples/models/tensorflow/flowers"
             }
         }
     }
@@ -47,22 +45,21 @@ mocked_unit_result = \
 
 
 def generate_inferenceservice():
-    tf_spec = V1alpha2TensorflowSpec(
+    tf_spec = V1beta1TFServingSpec(
         storage_uri='gs://kfserving-samples/models/tensorflow/flowers')
-    default_endpoint_spec = V1alpha2EndpointSpec(predictor=V1alpha2PredictorSpec(
-        tensorflow=tf_spec))
+    predictor_spec = V1beta1PredictorSpec(tensorflow=tf_spec)
 
-    isvc = V1alpha2InferenceService(
-        api_version='serving.kserve.io/v1alpha2',
+    isvc = V1beta1InferenceService(
+        api_version='serving.kserve.io/v1beta1',
         kind='InferenceService',
         metadata=client.V1ObjectMeta(name='flower-sample'),
-        spec=V1alpha2InferenceServiceSpec(default=default_endpoint_spec))
+        spec=V1beta1InferenceServiceSpec(predictor=predictor_spec))
     return isvc
 
 
-def test_inferenceservice_client_creat():
+def test_inferenceservice_client_create():
     '''Unit test for kserve create api'''
-    with patch('kserve.api.kf_serving_client.KServeClient.create',
+    with patch('kserve.api.kserve_client.KServeClient.create',
                return_value=mocked_unit_result):
         isvc = generate_inferenceservice()
         assert mocked_unit_result == kserve_client.create(
@@ -71,7 +68,7 @@ def test_inferenceservice_client_creat():
 
 def test_inferenceservice_client_get():
     '''Unit test for kserve get api'''
-    with patch('kserve.api.kf_serving_client.KServeClient.get',
+    with patch('kserve.api.kserve_client.KServeClient.get',
                return_value=mocked_unit_result):
         assert mocked_unit_result == kserve_client.get(
             'flower-sample', namespace='kubeflow')
@@ -79,7 +76,7 @@ def test_inferenceservice_client_get():
 
 def test_inferenceservice_client_watch():
     '''Unit test for kserve get api'''
-    with patch('kserve.api.kf_serving_client.KServeClient.get',
+    with patch('kserve.api.kserve_client.KServeClient.get',
                return_value=mocked_unit_result):
         assert mocked_unit_result == kserve_client.get('flower-sample', namespace='kubeflow',
                                                        watch=True, timeout_seconds=120)
@@ -87,7 +84,7 @@ def test_inferenceservice_client_watch():
 
 def test_inferenceservice_client_patch():
     '''Unit test for kserve patch api'''
-    with patch('kserve.api.kf_serving_client.KServeClient.patch',
+    with patch('kserve.api.kserve_client.KServeClient.patch',
                return_value=mocked_unit_result):
         isvc = generate_inferenceservice()
         assert mocked_unit_result == kserve_client.patch(
@@ -96,7 +93,7 @@ def test_inferenceservice_client_patch():
 
 def test_inferenceservice_client_replace():
     '''Unit test for kserve replace api'''
-    with patch('kserve.api.kf_serving_client.KServeClient.replace',
+    with patch('kserve.api.kserve_client.KServeClient.replace',
                return_value=mocked_unit_result):
         isvc = generate_inferenceservice()
         assert mocked_unit_result == kserve_client.replace(
@@ -105,7 +102,7 @@ def test_inferenceservice_client_replace():
 
 def test_inferenceservice_client_delete():
     '''Unit test for kserve delete api'''
-    with patch('kserve.api.kf_serving_client.KServeClient.delete',
+    with patch('kserve.api.kserve_client.KServeClient.delete',
                return_value=mocked_unit_result):
         assert mocked_unit_result == kserve_client.delete(
             'flower-sample', namespace='kubeflow')

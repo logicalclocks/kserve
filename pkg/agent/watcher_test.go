@@ -1,4 +1,5 @@
 /*
+Copyright 2021 The KServe Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,8 +18,8 @@ package agent
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	logger "log"
 	"net/http"
 	"net/http/httptest"
@@ -32,8 +33,9 @@ import (
 	"github.com/kserve/kserve/pkg/agent/mocks"
 	"github.com/kserve/kserve/pkg/agent/storage"
 	"github.com/kserve/kserve/pkg/apis/serving/v1alpha1"
+	"github.com/kserve/kserve/pkg/constants"
 	"github.com/kserve/kserve/pkg/modelconfig"
-	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"go.uber.org/zap"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -43,7 +45,7 @@ var _ = Describe("Watcher", func() {
 	var modelDir string
 	var sugar *zap.SugaredLogger
 	BeforeEach(func() {
-		dir, err := ioutil.TempDir("", "example")
+		dir, err := os.MkdirTemp("", "example")
 		if err != nil {
 			logger.Fatal(err)
 		}
@@ -62,7 +64,6 @@ var _ = Describe("Watcher", func() {
 			It("should download and load the new models", func() {
 				defer GinkgoRecover()
 				logger.Printf("Sync model config using temp dir %v\n", modelDir)
-				watcher := NewWatcher("/tmp/configs", modelDir, sugar)
 				modelConfigs := modelconfig.ModelConfigs{
 					{
 						Name: "model1",
@@ -81,7 +82,19 @@ var _ = Describe("Watcher", func() {
 						},
 					},
 				}
-				watcher.parseConfig(modelConfigs, false)
+				_, err := os.Stat("/tmp/configs")
+				if os.IsNotExist(err) {
+					if err := os.MkdirAll("/tmp/configs", os.ModePerm); err != nil {
+						logger.Fatal(err, " Failed to create configs directory")
+					}
+				}
+
+				file, _ := json.MarshalIndent(modelConfigs, "", " ")
+				if err := os.WriteFile("/tmp/configs/"+constants.ModelConfigFileName, file, os.ModePerm); err != nil {
+					logger.Fatal(err, " Failed to write config files")
+				}
+				watcher := NewWatcher("/tmp/configs", modelDir, sugar)
+
 				puller := Puller{
 					channelMap:  make(map[string]*ModelChannel),
 					completions: make(chan *ModelOp, 4),
@@ -99,12 +112,18 @@ var _ = Describe("Watcher", func() {
 					},
 					logger: sugar,
 				}
+				puller.waitGroup.wg.Add(len(watcher.ModelEvents))
 				go puller.processCommands(watcher.ModelEvents)
+
 				Eventually(func() int { return len(puller.channelMap) }).Should(Equal(0))
 				Eventually(func() int { return puller.opStats["model1"][Add] }).Should(Equal(1))
 				Eventually(func() int { return puller.opStats["model2"][Add] }).Should(Equal(1))
 				modelSpecMap, _ := SyncModelDir(modelDir+"/test1", watcher.logger)
 				Expect(watcher.ModelTracker).Should(Equal(modelSpecMap))
+
+				DeferCleanup(func() {
+					os.RemoveAll("/tmp/configs")
+				})
 			})
 		})
 	})
@@ -355,7 +374,7 @@ var _ = Describe("Watcher", func() {
 				Expect(err).To(BeNil())
 
 				testFile := filepath.Join(modelDir, modelName, "testModel1")
-				dat, err := ioutil.ReadFile(testFile)
+				dat, err := os.ReadFile(testFile)
 				Expect(err).To(BeNil())
 				Expect(string(dat)).To(Equal(modelContents))
 			})
@@ -570,7 +589,7 @@ var _ = Describe("Watcher", func() {
 					Expect(err).To(BeNil())
 
 					testFile := filepath.Join(modelDir, modelName, modelFile)
-					dat, err := ioutil.ReadFile(testFile)
+					dat, err := os.ReadFile(testFile)
 					Expect(err).To(BeNil())
 					Expect(string(dat)).To(Equal(modelContents + "\n"))
 				}
@@ -588,9 +607,8 @@ var _ = Describe("Watcher", func() {
 					Client: ts.Client(),
 				}
 
-				expectedErr := fmt.Errorf("URI: %s returned a %d response code", invalidModelStorageURI, 404)
 				actualErr := cl.DownloadModel(modelDir, modelName, invalidModelStorageURI)
-				Expect(actualErr).To(Equal(expectedErr))
+				Expect(actualErr).NotTo(Equal(nil))
 			})
 		})
 

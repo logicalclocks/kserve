@@ -1,3 +1,4 @@
+# Copyright 2021 The KServe Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import base64
 import glob
 import gzip
 import logging
@@ -21,12 +23,14 @@ import json
 import shutil
 import tarfile
 import tempfile
+from typing import Dict
 import zipfile
 from urllib.parse import urlparse
 import requests
 from pathlib import Path
 from azure.storage.blob import BlobServiceClient
 from azure.storage.blob._list_blobs_helper import BlobPrefix
+from azure.storage.fileshare import ShareServiceClient
 
 from botocore.client import Config
 from botocore import UNSIGNED
@@ -34,22 +38,32 @@ import boto3
 from google.auth import exceptions
 from google.cloud import storage
 
-from kserve.kfmodel_repository import MODEL_MOUNT_DIRS
+from .model_repository import MODEL_MOUNT_DIRS
 
 _GCS_PREFIX = "gs://"
 _S3_PREFIX = "s3://"
-_BLOB_RE = "https://(.+?).blob.core.windows.net/(.+)"
-_ACCOUNT_RE = "https://(.+?).blob.core.windows.net"
+_HDFS_PREFIX = "hdfs://"
+_WEBHDFS_PREFIX = "webhdfs://"
+_AZURE_BLOB_RE = "https://(.+?).blob.core.windows.net/(.+)"
+_AZURE_FILE_RE = "https://(.+?).file.core.windows.net/(.+)"
 _LOCAL_PREFIX = "file://"
 _URI_RE = "https?://(.+)/(.+)"
 _HTTP_PREFIX = "http(s)://"
 _HEADERS_SUFFIX = "-headers"
+_PVC_PREFIX = "/mnt/pvc"
+
+_HDFS_SECRET_DIRECTORY = "/var/secrets/kserve-hdfscreds"
+_HDFS_FILE_SECRETS = ["KERBEROS_KEYTAB", "TLS_CERT", "TLS_KEY", "TLS_CA"]
 
 
 class Storage(object):  # pylint: disable=too-few-public-methods
     @staticmethod
     def download(uri: str, out_dir: str = None) -> str:
+        Storage._update_with_storage_spec()
         logging.info("Copying contents of %s to local", uri)
+
+        if uri.startswith(_PVC_PREFIX) and not os.path.exists(uri):
+            raise Exception(f"Cannot locate source uri {uri} for PVC")
 
         is_local = False
         if uri.startswith(_LOCAL_PREFIX) or os.path.exists(uri):
@@ -67,8 +81,12 @@ class Storage(object):  # pylint: disable=too-few-public-methods
             Storage._download_gcs(uri, out_dir)
         elif uri.startswith(_S3_PREFIX):
             Storage._download_s3(uri, out_dir)
-        elif re.search(_BLOB_RE, uri):
-            Storage._download_blob(uri, out_dir)
+        elif uri.startswith(_HDFS_PREFIX) or uri.startswith(_WEBHDFS_PREFIX):
+            Storage._download_hdfs(uri, out_dir)
+        elif re.search(_AZURE_BLOB_RE, uri):
+            Storage._download_azure_blob(uri, out_dir)
+        elif re.search(_AZURE_FILE_RE, uri):
+            Storage._download_azure_file_share(uri, out_dir)
         elif is_local:
             return Storage._download_local(uri, out_dir)
         elif re.search(_URI_RE, uri):
@@ -84,6 +102,37 @@ class Storage(object):  # pylint: disable=too-few-public-methods
 
         logging.info("Successfully copied %s to %s", uri, out_dir)
         return out_dir
+
+    @staticmethod
+    def _update_with_storage_spec():
+        storage_secret_json = json.loads(os.environ.get("STORAGE_CONFIG", "{}"))
+        storage_secret_override_params = json.loads(os.environ.get("STORAGE_OVERRIDE_CONFIG", "{}"))
+        if storage_secret_override_params:
+            for key, value in storage_secret_override_params.items():
+                storage_secret_json[key] = value
+
+        if storage_secret_json.get("type", "") == "s3":
+            os.environ["AWS_ENDPOINT_URL"] = storage_secret_json.get("endpoint_url", "")
+            os.environ["AWS_ACCESS_KEY_ID"] = storage_secret_json.get("access_key_id", "")
+            os.environ["AWS_SECRET_ACCESS_KEY"] = storage_secret_json.get("secret_access_key", "")
+            os.environ["AWS_DEFAULT_REGION"] = storage_secret_json.get("region", "")
+            os.environ["AWS_CA_BUNDLE"] = storage_secret_json.get("certificate", "")
+            os.environ["awsAnonymousCredential"] = storage_secret_json.get("anonymous", "")
+
+        if storage_secret_json.get("type", "") == "hdfs" or storage_secret_json.get("type", "") == "webhdfs":
+            temp_dir = tempfile.mkdtemp()
+            os.environ["HDFS_SECRET_DIR"] = temp_dir
+            for key, value in storage_secret_json.items():
+                mode = "w"
+
+                # If the secret is supposed to be a file, then it was base64 encoded in the json
+                if key in _HDFS_FILE_SECRETS:
+                    value = base64.b64decode(value)
+                    mode = "wb"
+
+                with open(f"{temp_dir}/{key}", mode) as f:
+                    f.write(value)
+                    f.flush()
 
     @staticmethod
     def get_S3_config():
@@ -102,9 +151,13 @@ class Storage(object):  # pylint: disable=too-few-public-methods
         #    if awsAnonymousCredential env var true, passed in via config
         # 2. Environment variables
         # 3. ~/.aws/config file
-        s3 = boto3.resource('s3',
-                            endpoint_url=os.getenv("AWS_ENDPOINT_URL", "http://s3.amazonaws.com"),
-                            config=Storage.get_S3_config())
+        kwargs = {
+            "config": Storage.get_S3_config()
+        }
+        endpoint_url = os.getenv("AWS_ENDPOINT_URL")
+        if endpoint_url:
+            kwargs.update({"endpoint_url": endpoint_url})
+        s3 = boto3.resource("s3", **kwargs)
         parsed = urlparse(uri, scheme='s3')
         bucket_name = parsed.netloc
         bucket_path = parsed.path.lstrip('/')
@@ -117,8 +170,20 @@ class Storage(object):  # pylint: disable=too-few-public-methods
                 continue
             # In the case where bucket_path points to a single object, set the target key to bucket_path
             # Otherwise, remove the bucket_path prefix, strip any extra slashes, then prepend the target_dir
+            # Example:
+            # s3://test-bucket
+            # Objects: /a/b/c/model.bin /a/model.bin /model.bin
+            #
+            # If 'uri' is set to "s3://test-bucket", then the downloader will
+            # download all the objects listed above, re-creating their subpaths
+            # under the temp_dir.
+            # If 'uri' is set to "s3://test-bucket/a", then the downloader will
+            # add to temp_dir: b/c/model.bin and model.bin.
+            # If 'uri' is set to "s3://test-bucket/a/b/c/model.bin", then
+            # the downloader will add to temp dir: model.bin
+            # (without any subpaths).
             target_key = (
-                obj.key
+                obj.key.rsplit("/", 1)[-1]
                 if bucket_path == obj.key
                 else obj.key.replace(bucket_path, "", 1).lstrip("/")
             )
@@ -126,7 +191,11 @@ class Storage(object):  # pylint: disable=too-few-public-methods
             if not os.path.exists(os.path.dirname(target)):
                 os.makedirs(os.path.dirname(target), exist_ok=True)
             bucket.download_file(obj.key, target)
+            logging.info('Downloaded object %s to %s' % (obj.key, target))
             count = count + 1
+        if count == 0:
+            raise RuntimeError(
+                "Failed to fetch model. No model found in %s." % bucket_path)
 
         # Unpack compressed file, supports .tgz, tar.gz and zip file formats.
         if count == 1:
@@ -151,21 +220,21 @@ class Storage(object):  # pylint: disable=too-few-public-methods
         count = 0
         for blob in blobs:
             # Replace any prefix from the object key with temp_dir
-            subdir_object_key = blob.name.replace(bucket_path, "", 1).strip("/")
+            subdir_object_key = blob.name.replace(bucket_path, "", 1).lstrip("/")
 
             # Create necessary subdirectory to store the object locally
             if "/" in subdir_object_key:
                 local_object_dir = os.path.join(temp_dir, subdir_object_key.rsplit("/", 1)[0])
                 if not os.path.isdir(local_object_dir):
                     os.makedirs(local_object_dir, exist_ok=True)
-            if subdir_object_key.strip() != "":
+            if subdir_object_key.strip() != "" and not subdir_object_key.endswith("/"):
                 dest_path = os.path.join(temp_dir, subdir_object_key)
                 logging.info("Downloading: %s", dest_path)
                 blob.download_to_filename(dest_path)
             count = count + 1
         if count == 0:
-            raise RuntimeError("Failed to fetch model. \
-The path or model %s does not exist." % uri)
+            raise RuntimeError(
+                "Failed to fetch model. No model found in %s." % uri)
 
         # Unpack compressed file, supports .tgz, tar.gz and zip file formats.
         if count == 1:
@@ -174,20 +243,116 @@ The path or model %s does not exist." % uri)
                 Storage._unpack_archive_file(dest_path, mimetype, temp_dir)
 
     @staticmethod
-    def _download_blob(uri, out_dir: str):  # pylint: disable=too-many-locals
-        match = re.search(_BLOB_RE, uri)
-        account_url = re.search(_ACCOUNT_RE, uri).group(0)
-        account_name = match.group(1)
-        storage_url = match.group(2)
-        container_name, prefix = storage_url.split("/", 1)
+    def _load_hdfs_configuration() -> Dict:
+        config = {
+            "HDFS_NAMENODE": None,
+            "USER_PROXY": None,
+            "HDFS_ROOTPATH": None,
+            "TLS_CERT": None,
+            "TLS_KEY": None,
+            "TLS_CA": None,
+            "TLS_SKIP_VERIFY": "false",
+            "HEADERS": None,
+            "N_THREADS": "2",
+            "KERBEROS_KEYTAB": None,
+            "KERBEROS_PRINCIPAL": None,
+        }
 
+        secret_dir = _HDFS_SECRET_DIRECTORY
+        if os.environ.get("HDFS_SECRET_DIR"):
+            secret_dir = os.environ["HDFS_SECRET_DIR"]
+
+        for filename in os.listdir(secret_dir):
+            if filename not in config:
+                continue
+
+            # We don't read files which are supposed to be files, just save their path
+            if filename in _HDFS_FILE_SECRETS:
+                config[filename] = f"{secret_dir}/{filename}"
+                continue
+
+            # Read file and save value in config dict
+            with open(f"{secret_dir}/{filename}") as f:
+                config[filename] = f.read()
+
+        return config
+
+    @staticmethod
+    def _download_hdfs(uri, out_dir: str):
+        from krbcontext.context import krbContext
+        from hdfs.ext.kerberos import Client, KerberosClient
+
+        config = Storage._load_hdfs_configuration()
+
+        logging.info(f"Using the following hdfs config\n{config}")
+
+        # Remove hdfs:// or webhdfs:// from the uri to get just the path
+        # e.g. hdfs://user/me/model -> user/me/model
+        if uri.startswith(_HDFS_PREFIX):
+            path = uri[len(_HDFS_PREFIX):]
+        else:
+            path = uri[len(_WEBHDFS_PREFIX):]
+
+        if not config["HDFS_ROOTPATH"]:
+            path = "/" + path
+
+        s = requests.Session()
+
+        if config["TLS_CERT"]:
+            s.cert = (config["TLS_CERT"], config["TLS_KEY"])
+        # s.verify = , True, False, or CA PATH
+        if config["TLS_CA"]:
+            s.verify = config["TLS_CA"]
+        if config["TLS_SKIP_VERIFY"].lower() == "true":
+            s.verify = False
+
+        if config["HEADERS"]:
+            headers = json.loads(config["HEADERS"])
+            s.headers.update(headers)
+
+        if config["KERBEROS_PRINCIPAL"]:
+            context = krbContext(
+                using_keytab=True,
+                principal=config["KERBEROS_PRINCIPAL"],
+                keytab_file=config["KERBEROS_KEYTAB"]
+            )
+            context.init_with_keytab()
+            client = KerberosClient(
+                config["HDFS_NAMENODE"],
+                proxy=config["USER_PROXY"],
+                root=config["HDFS_ROOTPATH"],
+                session=s
+            )
+        else:
+            client = Client(
+                config["HDFS_NAMENODE"],
+                proxy=config["USER_PROXY"],
+                root=config["HDFS_ROOTPATH"],
+                session=s
+            )
+
+        # Check path exists and get path status
+        # Raises HdfsError when path does not exist
+        status = client.status(path)
+
+        if status["type"] == "FILE":
+            client.download(path, out_dir, n_threads=1)
+        else:
+            files = client.list(path)
+            for f in files:
+                client.download(f"{path}/{f}", out_dir, n_threads=int(config["N_THREADS"]))
+
+    @staticmethod
+    def _download_azure_blob(uri, out_dir: str):  # pylint: disable=too-many-locals
+        account_name, account_url, container_name, prefix = Storage._parse_azure_uri(uri)
         logging.info("Connecting to BLOB account: [%s], container: [%s], prefix: [%s]",
                      account_name,
                      container_name,
                      prefix)
-        token = Storage._get_azure_storage_token()
+        token = Storage._get_azure_storage_token() or Storage._get_azure_storage_access_key()
         if token is None:
-            logging.warning("Azure credentials not found, retrying anonymous access")
+            logging.warning("Azure credentials or shared access signature token not found, retrying anonymous access")
+
         blob_service_client = BlobServiceClient(account_url, credential=token)
         container_client = blob_service_client.get_container_client(container_name)
         count = 0
@@ -205,7 +370,7 @@ The path or model %s does not exist." % uri)
                 else:
                     blobs += container_client.list_blobs(name_starts_with=item.name,
                                                          include=['snapshots'])
-        for blob in set(blobs):
+        for blob in blobs:
             dest_path = os.path.join(out_dir, blob.name.replace(prefix, "", 1).lstrip("/"))
             Path(os.path.dirname(dest_path)).mkdir(parents=True, exist_ok=True)
             logging.info("Downloading: %s to %s", blob.name, dest_path)
@@ -214,8 +379,8 @@ The path or model %s does not exist." % uri)
                 f.write(downloader.readall())
             count = count + 1
         if count == 0:
-            raise RuntimeError("Failed to fetch model. \
-The path or model %s does not exist." % (uri))
+            raise RuntimeError(
+                "Failed to fetch model. No model found in %s." % (uri))
 
         # Unpack compressed file, supports .tgz, tar.gz and zip file formats.
         if count == 1:
@@ -224,23 +389,93 @@ The path or model %s does not exist." % (uri))
                 Storage._unpack_archive_file(dest_path, mimetype, out_dir)
 
     @staticmethod
+    def _download_azure_file_share(uri, out_dir: str):  # pylint: disable=too-many-locals
+        account_name, account_url, share_name, prefix = Storage._parse_azure_uri(uri)
+        logging.info("Connecting to file share account: [%s], container: [%s], prefix: [%s]",
+                     account_name,
+                     share_name,
+                     prefix)
+        access_key = Storage._get_azure_storage_access_key()
+        if access_key is None:
+            logging.warning("Azure storage access key not found, retrying anonymous access")
+
+        share_service_client = ShareServiceClient(account_url, credential=access_key)
+        share_client = share_service_client.get_share_client(share_name)
+        count = 0
+        share_files = []
+        max_depth = 5
+        stack = [(prefix, max_depth)]
+        while stack:
+            curr_prefix, depth = stack.pop()
+            if depth < 0:
+                continue
+            for item in share_client.list_directories_and_files(
+                    directory_name=curr_prefix):
+                if item.is_directory:
+                    stack.append(('/'.join([curr_prefix, item.name]).strip('/'), depth - 1))
+                else:
+                    share_files.append((curr_prefix, item))
+        for prefix, file_item in share_files:
+            parts = [prefix] if prefix else []
+            parts.append(file_item.name)
+            file_path = '/'.join(parts).lstrip('/')
+            dest_path = os.path.join(out_dir, file_path)
+            Path(os.path.dirname(dest_path)).mkdir(parents=True, exist_ok=True)
+            logging.info("Downloading: %s to %s", file_item.name, dest_path)
+            file_client = share_client.get_file_client(file_path)
+            with open(dest_path, "wb+") as f:
+                data = file_client.download_file()
+                data.readinto(f)
+            count = count + 1
+        if count == 0:
+            raise RuntimeError(
+                "Failed to fetch model. No model found in %s." % (uri))
+
+        # Unpack compressed file, supports .tgz, tar.gz and zip file formats.
+        if count == 1:
+            mimetype, _ = mimetypes.guess_type(dest_path)
+            if mimetype in ["application/x-tar", "application/zip"]:
+                Storage._unpack_archive_file(dest_path, mimetype, out_dir)
+
+    @staticmethod
+    def _parse_azure_uri(uri):  # pylint: disable=too-many-locals
+        parsed = urlparse(uri)
+        account_name = parsed.netloc.split('.')[0]
+        account_url = 'https://{}{}'.format(parsed.netloc, '?' + parsed.query if parsed.query else '')
+        object_name, prefix = parsed.path.lstrip('/').split("/", 1)
+        prefix = prefix.strip('/')
+        return account_name, account_url, object_name, prefix
+
+    @staticmethod
     def _get_azure_storage_token():
         tenant_id = os.getenv("AZ_TENANT_ID", "")
         client_id = os.getenv("AZ_CLIENT_ID", "")
         client_secret = os.getenv("AZ_CLIENT_SECRET", "")
-        subscription_id = os.getenv("AZ_SUBSCRIPTION_ID", "")
 
-        if tenant_id == "" or client_id == "" or client_secret == "" or subscription_id == "":
+        # convert old environment variable to conform Azure defaults
+        # see azure/identity/_constants.py
+        if tenant_id:
+            os.environ["AZURE_TENANT_ID"] = tenant_id
+        if client_id:
+            os.environ["AZURE_CLIENT_ID"] = client_id
+        if client_secret:
+            os.environ["AZURE_CLIENT_SECRET"] = client_secret
+
+        client_id = os.getenv("AZURE_CLIENT_ID", "")
+        if not client_id:
             return None
 
         # note the SP must have "Storage Blob Data Owner" perms for this to work
-        from azure.identity import ClientSecretCredential
-        token_credential = ClientSecretCredential(tenant_id,
-                                                  client_id, client_secret)
+        from azure.identity import DefaultAzureCredential
+        token_credential = DefaultAzureCredential()
 
         logging.info("Retrieved SP token credential for client_id: %s",
                      client_id)
         return token_credential
+
+    @staticmethod
+    def _get_azure_storage_access_key():
+        return os.getenv("AZURE_STORAGE_ACCESS_KEY")
 
     @staticmethod
     def _download_local(uri, out_dir=None):
@@ -263,7 +498,9 @@ The path or model %s does not exist." % (uri))
             logging.info("Linking: %s to %s", src, dest_path)
             os.symlink(src, dest_path)
             count = count + 1
-
+        if count == 0:
+            raise RuntimeError(
+                "Failed to fetch model. No model found in %s." % (uri))
         # Unpack compressed file, supports .tgz, tar.gz and zip file formats.
         if count == 1:
             mimetype, _ = mimetypes.guess_type(dest_path)
@@ -334,6 +571,6 @@ The path or model %s does not exist." % (uri))
             archive.extractall(target_dir)
             archive.close()
         except (tarfile.TarError, zipfile.BadZipfile):
-            raise RuntimeError("Failed to unpack archieve file. \
+            raise RuntimeError("Failed to unpack archive file. \
 The file format is not valid.")
         os.remove(file_path)

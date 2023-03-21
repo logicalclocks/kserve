@@ -1,8 +1,8 @@
 # Autoscaling
-KFServing supports the implementation of Knative Pod Autoscaler (KPA) and Kubernetes’ Horizontal Pod Autoscaler (HPA).
+KServe supports the implementation of Knative Pod Autoscaler (KPA) and Kubernetes’ Horizontal Pod Autoscaler (HPA).
 The features and limitations of each of these Autoscalers are listed below.
 
-IMPORTANT: If you want to use Kubernetes Horizontal Pod Autoscaler (HPA), you must install [HPA extension](https://knative.dev/docs/install/any-kubernetes-cluster/#optional-serving-extensions)
+IMPORTANT: If you want to use Kubernetes Horizontal Pod Autoscaler (HPA), you must install [HPA extension](https://knative.dev/docs/install/yaml-install/serving/install-serving-with-yaml/#install-optional-serving-extensions)
  after you install Knative Serving.
 
 Knative Pod Autoscaler (KPA)
@@ -32,7 +32,7 @@ metadata:
 spec:
   predictor:
     pytorch:
-      storageUri: "gs://kfserving-examples/models/torchserve/image_classifier"
+      storageUri: "gs://kfserving-examples/models/torchserve/image_classifier/v1"
 ```
 
 ### Hard limit
@@ -49,7 +49,7 @@ spec:
   predictor:
     containerConcurrency: 10
     pytorch:
-      storageUri: "gs://kfserving-examples/models/torchserve/image_classifier"
+      storageUri: "gs://kfserving-examples/models/torchserve/image_classifier/v1"
 ```
 
 ### Create the InferenceService
@@ -66,7 +66,7 @@ $inferenceservice.serving.kserve.io/torchserve created
 
 ## Run inference with concurrent requests
 
-The first step is to [determine the ingress IP and ports](../../../../../README.md#determine-the-ingress-ip-and-ports) and set `INGRESS_HOST` and `INGRESS_PORT`
+The first step is to [determine the ingress IP and ports](https://kserve.github.io/website/master/get_started/first_isvc/#4-determine-the-ingress-ip-and-ports) and set `INGRESS_HOST` and `INGRESS_PORT`
 
 Install hey load generator 
 ```bash
@@ -85,7 +85,7 @@ SERVICE_HOSTNAME=$(kubectl get inferenceservice torchserve -o jsonpath='{.status
 `hey` by default generates 50 requests concurrently, so you can see that the InferenceService scales to 5 pods as the container concurrency target is 10.
 
 ```bash
-kubectl get pods -n kfserving-test 
+kubectl get pods -n kserve-test 
 
 NAME                                                             READY   STATUS        RESTARTS   AGE
 torchserve-predictor-default-cj2d8-deployment-69444c9c74-67qwb   2/2     Terminating   0          103s

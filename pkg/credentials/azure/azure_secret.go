@@ -1,4 +1,5 @@
 /*
+Copyright 2021 The KServe Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,55 +21,65 @@ import (
 )
 
 const (
-	AzureSubscriptionId = "AZ_SUBSCRIPTION_ID"
-	AzureTenantId       = "AZ_TENANT_ID"
-	AzureClientId       = "AZ_CLIENT_ID"
-	AzureClientSecret   = "AZ_CLIENT_SECRET"
+	AzureStorageAccessKey = "AZURE_STORAGE_ACCESS_KEY"
+	// Legacy keys for backward compatibility
+	LegacyAzureSubscriptionId = "AZ_SUBSCRIPTION_ID"
+	LegacyAzureTenantId       = "AZ_TENANT_ID"
+	LegacyAzureClientId       = "AZ_CLIENT_ID"
+	LegacyAzureClientSecret   = "AZ_CLIENT_SECRET"
+
+	// Conforms to Azure constants
+	AzureSubscriptionId = "AZURE_SUBSCRIPTION_ID"
+	AzureTenantId       = "AZURE_TENANT_ID"
+	AzureClientId       = "AZURE_CLIENT_ID"
+	AzureClientSecret   = "AZURE_CLIENT_SECRET"
+)
+
+var (
+	LegacyAzureEnvKeys        = []string{LegacyAzureSubscriptionId, LegacyAzureTenantId, LegacyAzureClientId, LegacyAzureClientSecret}
+	AzureEnvKeys              = []string{AzureSubscriptionId, AzureTenantId, AzureClientId, AzureClientSecret}
+	legacyAzureEnvKeyMappings = map[string]string{
+		AzureSubscriptionId: LegacyAzureSubscriptionId,
+		AzureTenantId:       LegacyAzureTenantId,
+		AzureClientId:       LegacyAzureClientId,
+		AzureClientSecret:   LegacyAzureClientSecret,
+	}
 )
 
 func BuildSecretEnvs(secret *v1.Secret) []v1.EnvVar {
+	var envs []v1.EnvVar
+	for _, k := range AzureEnvKeys {
+		dataKey := k
+		legacyDataKey := legacyAzureEnvKeyMappings[k]
+		if _, ok := secret.Data[legacyDataKey]; ok {
+			dataKey = legacyDataKey
+		}
+		envs = append(envs, v1.EnvVar{
+			Name: k,
+			ValueFrom: &v1.EnvVarSource{
+				SecretKeyRef: &v1.SecretKeySelector{
+					LocalObjectReference: v1.LocalObjectReference{
+						Name: secret.Name,
+					},
+					Key: dataKey,
+				},
+			},
+		})
+	}
+
+	return envs
+}
+
+func BuildStorageAccessKeySecretEnv(secret *v1.Secret) []v1.EnvVar {
 	envs := []v1.EnvVar{
 		{
-			Name: AzureSubscriptionId,
+			Name: AzureStorageAccessKey,
 			ValueFrom: &v1.EnvVarSource{
 				SecretKeyRef: &v1.SecretKeySelector{
 					LocalObjectReference: v1.LocalObjectReference{
 						Name: secret.Name,
 					},
-					Key: AzureSubscriptionId,
-				},
-			},
-		},
-		{
-			Name: AzureTenantId,
-			ValueFrom: &v1.EnvVarSource{
-				SecretKeyRef: &v1.SecretKeySelector{
-					LocalObjectReference: v1.LocalObjectReference{
-						Name: secret.Name,
-					},
-					Key: AzureTenantId,
-				},
-			},
-		},
-		{
-			Name: AzureClientId,
-			ValueFrom: &v1.EnvVarSource{
-				SecretKeyRef: &v1.SecretKeySelector{
-					LocalObjectReference: v1.LocalObjectReference{
-						Name: secret.Name,
-					},
-					Key: AzureClientId,
-				},
-			},
-		},
-		{
-			Name: AzureClientSecret,
-			ValueFrom: &v1.EnvVarSource{
-				SecretKeyRef: &v1.SecretKeySelector{
-					LocalObjectReference: v1.LocalObjectReference{
-						Name: secret.Name,
-					},
-					Key: AzureClientSecret,
+					Key: AzureStorageAccessKey,
 				},
 			},
 		},

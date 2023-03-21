@@ -1,4 +1,5 @@
 /*
+Copyright 2021 The KServe Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,7 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/onsi/gomega"
-	"io/ioutil"
+	"io"
 	pkglogging "knative.dev/pkg/logging"
 	"net/http"
 	"net/http/httptest"
@@ -40,7 +41,7 @@ func serveRequest(batchHandler *BatchHandler, wg *sync.WaitGroup, index int) {
 	w := httptest.NewRecorder()
 	batchHandler.ServeHTTP(w, r)
 
-	b2, _ := ioutil.ReadAll(w.Result().Body)
+	b2, _ := io.ReadAll(w.Result().Body)
 	var res Response
 	_ = json.Unmarshal(b2, &res)
 	fmt.Printf("Got response %v\n", res)
@@ -54,7 +55,7 @@ func TestBatcher(t *testing.T) {
 	responseChan := make(chan Response)
 	// Start a local HTTP server
 	predictor := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
-		b, err := ioutil.ReadAll(req.Body)
+		b, err := io.ReadAll(req.Body)
 		g.Expect(err).To(gomega.BeNil())
 		var request Request
 		err = json.Unmarshal(b, &request)
@@ -84,4 +85,88 @@ func TestBatcher(t *testing.T) {
 	//var responseBytes []byte
 	<-responseChan
 	wg.Wait()
+}
+
+// Tests batcher when inference response code is other than 200
+func TestBatcherFail(t *testing.T) {
+	g := gomega.NewGomegaWithT(t)
+
+	logger, _ := pkglogging.NewLogger("", "INFO")
+
+	responseChan := make(chan Response)
+	// Start a local HTTP server
+	predictor := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+		b, err := io.ReadAll(req.Body)
+		g.Expect(err).To(gomega.BeNil())
+		var request Request
+		err = json.Unmarshal(b, &request)
+		g.Expect(err).To(gomega.BeNil())
+		logger.Infof("Get request %v", string(b))
+		response := Response{}
+		responseChan <- response
+		responseBytes, err := json.Marshal(response)
+		g.Expect(err).To(gomega.BeNil())
+		rw.WriteHeader(500)
+		_, err = rw.Write(responseBytes)
+		g.Expect(err).To(gomega.BeNil())
+	}))
+	// Close the server when test finishes
+	defer predictor.Close()
+	predictorSvcUrl, err := url.Parse(predictor.URL)
+	logger.Infof("predictor url %s", predictorSvcUrl)
+	g.Expect(err).To(gomega.BeNil())
+	httpProxy := httputil.NewSingleHostReverseProxy(predictorSvcUrl)
+	batchHandler := New(32, 50, httpProxy, logger)
+	var wg sync.WaitGroup
+	for i := 0; i < 10; i++ {
+		wg.Add(1)
+		go serveRequest(batchHandler, &wg, i)
+	}
+	//var responseBytes []byte
+	<-responseChan
+	wg.Wait()
+}
+
+// Tests default max batch size and max latency
+func TestBatcherDefaults(t *testing.T) {
+	g := gomega.NewGomegaWithT(t)
+
+	logger, _ := pkglogging.NewLogger("", "INFO")
+
+	responseChan := make(chan Response)
+	// Start a local HTTP server
+	predictor := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+		b, err := io.ReadAll(req.Body)
+		g.Expect(err).To(gomega.BeNil())
+		var request Request
+		err = json.Unmarshal(b, &request)
+		g.Expect(err).To(gomega.BeNil())
+		logger.Infof("Get request %v", string(b))
+		response := Response{
+			Predictions: request.Instances,
+		}
+		responseChan <- response
+		responseBytes, err := json.Marshal(response)
+		g.Expect(err).To(gomega.BeNil())
+		rw.WriteHeader(500)
+		_, err = rw.Write(responseBytes)
+		g.Expect(err).To(gomega.BeNil())
+	}))
+	// Close the server when test finishes
+	defer predictor.Close()
+	predictorSvcUrl, err := url.Parse(predictor.URL)
+	logger.Infof("predictor url %s", predictorSvcUrl)
+	g.Expect(err).To(gomega.BeNil())
+	httpProxy := httputil.NewSingleHostReverseProxy(predictorSvcUrl)
+	batchHandler := New(-1, -1, httpProxy, logger)
+	var wg sync.WaitGroup
+	for i := 0; i < 10; i++ {
+		wg.Add(1)
+		go serveRequest(batchHandler, &wg, i)
+	}
+	//var responseBytes []byte
+	<-responseChan
+	wg.Wait()
+	g.Expect(batchHandler.MaxBatchSize).To(gomega.Equal(MaxBatchSize))
+	g.Expect(batchHandler.MaxLatency).To(gomega.Equal(MaxLatency))
 }

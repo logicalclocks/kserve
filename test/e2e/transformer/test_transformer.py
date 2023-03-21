@@ -12,7 +12,6 @@
 # limitations under the License.
 
 import os
-import numpy as np
 from kubernetes import client
 
 from kserve import KServeClient
@@ -25,34 +24,37 @@ from kserve import V1beta1InferenceService
 from kubernetes.client import V1ResourceRequirements
 from kubernetes.client import V1Container
 from kubernetes.client import V1EnvVar
+import pytest
 from ..common.utils import predict
 from ..common.utils import KSERVE_TEST_NAMESPACE
 
-kserve_client = KServeClient(config_file=os.environ.get("KUBECONFIG", "~/.kube/config"))
 
-
+@pytest.mark.transformer
 def test_transformer():
     service_name = 'isvc-transformer'
     predictor = V1beta1PredictorSpec(
         min_replicas=1,
         pytorch=V1beta1TorchServeSpec(
-            storage_uri='gs://kfserving-examples/models/torchserve/image_classifier',
+            storage_uri="gs://kfserving-examples/models/torchserve/image_classifier/v1",
+            protocol_version="v1",
             resources=V1ResourceRequirements(
-                requests={'cpu': '100m', 'memory': '1Gi'},
-                limits={'cpu': '100m', 'memory': '1Gi'}
-            )
+                requests={"cpu": "10m", "memory": "128Mi"},
+                limits={"cpu": "1", "memory": "1Gi"},
+            ),
         ),
     )
     transformer = V1beta1TransformerSpec(
         min_replicas=1,
         containers=[V1Container(
-                      image='809251082950.dkr.ecr.us-west-2.amazonaws.com/kserve/image-transformer:latest',
+                      image='kserve/image-transformer:'
+                            + os.environ.get("GITHUB_SHA"),
                       name='kserve-container',
                       resources=V1ResourceRequirements(
-                          requests={'cpu': '100m', 'memory': '1Gi'},
+                          requests={'cpu': '10m', 'memory': '128Mi'},
                           limits={'cpu': '100m', 'memory': '1Gi'}),
+                      args=["--model_name", "mnist"],
                       env=[V1EnvVar(name="STORAGE_URI",
-                                    value="gs://kfserving-examples/models/torchserve/image_classifier")])]
+                                    value="gs://kfserving-examples/models/torchserve/image_classifier/v1")])]
     )
 
     isvc = V1beta1InferenceService(api_version=constants.KSERVE_V1BETA1,
@@ -61,6 +63,7 @@ def test_transformer():
                                        name=service_name, namespace=KSERVE_TEST_NAMESPACE),
                                    spec=V1beta1InferenceServiceSpec(predictor=predictor, transformer=transformer))
 
+    kserve_client = KServeClient(config_file=os.environ.get("KUBECONFIG", "~/.kube/config"))
     kserve_client.create(isvc)
     try:
         kserve_client.wait_isvc_ready(service_name, namespace=KSERVE_TEST_NAMESPACE)
@@ -74,6 +77,6 @@ def test_transformer():
         for pod in pods.items:
             print(pod)
         raise e
-    res = predict(service_name, './data/torchserve_input.json', model_name='mnist')
-    assert(np.argmax(res["predictions"]) == 0)
+    res = predict(service_name, "./data/transformer.json", model_name="mnist")
+    assert (res.get("predictions")[0] == 2)
     kserve_client.delete(service_name, KSERVE_TEST_NAMESPACE)

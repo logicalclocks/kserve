@@ -12,11 +12,14 @@
 # limitations under the License.
 
 import logging
-from typing import Dict
+from typing import Dict, Union
 import pickle
 
 import kserve
 import numpy as np
+
+from kserve import InferRequest, InferResponse
+from kserve.protocol.grpc.grpc_predict_v2_pb2 import ModelInferRequest, ModelInferResponse
 
 
 class PipeStep(object):
@@ -33,7 +36,7 @@ class PipeStep(object):
         return self._step_func(X)
 
 
-class RFModel(kserve.KFModel):  # pylint:disable=c-extension-no-member
+class RFModel(kserve.Model):  # pylint:disable=c-extension-no-member
     def __init__(self, name: str):
         super().__init__(name)
         self.name = name
@@ -48,8 +51,9 @@ class RFModel(kserve.KFModel):  # pylint:disable=c-extension-no-member
         self.ready = True
         return self.ready
 
-    def predict(self, request: Dict) -> Dict:
-        instances = request["instances"]
+    def predict(self, payload: Union[Dict, InferRequest, ModelInferRequest],
+                headers: Dict[str, str] = None) -> Union[Dict, InferResponse, ModelInferResponse]:
+        instances = payload["instances"]
 
         try:
             inputs = np.asarray(instances)

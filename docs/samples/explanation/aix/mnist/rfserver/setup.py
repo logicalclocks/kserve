@@ -25,16 +25,14 @@ setup(
     license='https://github.com/kserve/kserve/LICENSE',
     url='https://github.com/kserve/kserve/python/rfserver',
     description='Model Server implementation for AI eXplainability using LIME. \
-                 Not intended for use outside KFServing Frameworks Images',
+                 Not intended for use outside KServe Frameworks Images',
     long_description=open('README.md').read(),
-    python_requires='>3.4',
+    python_requires='>3.7',
     packages=find_packages("rfserver"),
     install_requires=[
-        "kfserving>=0.2.1",
-        "argparse >= 1.4.0",
-        "numpy >= 1.8.2",
-        "scikit-learn >= 0.0",
-        "scikit-image >= 0.0",
+        "kserve",
+        "scikit-learn",
+        "scikit-image",
     ],
     tests_require=tests_require,
     extras_require={'test': tests_require}

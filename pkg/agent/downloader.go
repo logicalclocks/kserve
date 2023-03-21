@@ -1,4 +1,5 @@
 /*
+Copyright 2021 The KServe Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,7 +20,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -60,7 +60,7 @@ func (d *Downloader) DownloadModel(modelName string, modelSpec *v1alpha1.ModelSp
 			if err != nil {
 				return errors.Wrapf(createErr, "failed to encode model spec")
 			}
-			err = ioutil.WriteFile(successFile, encodedJson, 0644)
+			err = os.WriteFile(successFile, encodedJson, 0644)
 			if err != nil {
 				return errors.Wrapf(createErr, "failed to write the success file")
 			}
@@ -104,7 +104,7 @@ func extractProtocol(storageURI string) (storage.Protocol, error) {
 	}
 
 	if !regexp.MustCompile("\\w+?://").MatchString(storageURI) {
-		return "", fmt.Errorf("there is no protocol specificed for the storageUri")
+		return "", fmt.Errorf("there is no protocol specified for the storageUri")
 	}
 
 	for _, prefix := range storage.SupportedProtocols {

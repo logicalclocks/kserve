@@ -1,3 +1,4 @@
+# Copyright 2021 The KServe Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,18 +14,18 @@
 
 import os
 
-# KFServing K8S constants
+# KServe K8S constants
 KSERVE_GROUP = 'serving.kserve.io'
 KSERVE_KIND = 'InferenceService'
 KSERVE_PLURAL = 'inferenceservices'
 KSERVE_KIND_TRAINEDMODEL = 'TrainedModel'
 KSERVE_PLURAL_TRAINEDMODEL = 'trainedmodels'
+KSERVE_KIND_INFERENCEGRAPH = 'InferenceGraph'
+KSERVE_PLURAL_INFERENCEGRAPH = 'inferencegraphs'
 KSERVE_V1BETA1_VERSION = 'v1beta1'
-KSERVE_V1ALPHA2_VERSION = 'v1alpha2'
 KSERVE_V1ALPHA1_VERSION = "v1alpha1"
 
 KSERVE_V1BETA1 = KSERVE_GROUP + '/' + KSERVE_V1BETA1_VERSION
-KSERVE_V1ALPHA2 = KSERVE_GROUP + '/' + KSERVE_V1ALPHA2_VERSION
 KSERVE_V1ALPHA1 = KSERVE_GROUP + '/' + KSERVE_V1ALPHA1_VERSION
 
 KSERVE_LOGLEVEL = os.environ.get('KSERVE_LOGLEVEL', 'INFO').upper()
@@ -46,3 +47,27 @@ GCS_DEFAULT_CREDS_FILE = '~/.config/gcloud/application_default_credentials.json'
 
 # Azure credentials constants
 AZ_DEFAULT_CREDS_FILE = '~/.azure/azure_credentials.json'
+
+# Model Serve Constants
+KSERVE_MODEL_SERVER_NAME = "kserve"
+
+# GRPC content datatype mappings constants
+GRPC_CONTENT_DATATYPE_MAPPINGS = {
+    "BOOL": "bool_contents",
+    "INT8": "int_contents",
+    "INT16": "int_contents",
+    "INT32": "int_contents",
+    "INT64": "int64_contents",
+    "UINT8": "uint_contents",
+    "UINT16": "uint_contents",
+    "UINT32": "uint_contents",
+    "UINT64": "uint64_contents",
+    "FP32": "fp32_contents",
+    "FP64": "fp64_contents",
+    "BYTES": "bytes_contents"
+}
+# K8S status key constants
+OBSERVED_GENERATION = 'observedGeneration'
+
+# K8S metadata key constants
+GENERATION = 'generation'

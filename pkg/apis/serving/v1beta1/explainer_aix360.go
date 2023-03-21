@@ -1,4 +1,5 @@
 /*
+Copyright 2021 The KServe Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -43,13 +44,6 @@ type AIXExplainerSpec struct {
 
 var _ ComponentImplementation = &AIXExplainerSpec{}
 
-func (s *AIXExplainerSpec) GetStorageUri() *string {
-	if s.StorageURI == "" {
-		return nil
-	}
-	return &s.StorageURI
-}
-
 func (s *AIXExplainerSpec) GetResourceRequirements() *v1.ResourceRequirements {
 	// return the ResourceRequirements value if set on the spec
 	return &s.Resources
@@ -89,12 +83,13 @@ func (s *AIXExplainerSpec) GetContainer(metadata metav1.ObjectMeta, extensions *
 		args = append(args, s.Config[k])
 	}
 	args = append(args, s.Args...)
-	return &v1.Container{
-		Image:     config.Explainers.AIXExplainer.ContainerImage + ":" + *s.RuntimeVersion,
-		Name:      constants.InferenceServiceContainerName,
-		Resources: s.Resources,
-		Args:      args,
+
+	if s.Container.Image == "" {
+		s.Container.Image = config.Explainers.AIXExplainer.ContainerImage + ":" + *s.RuntimeVersion
 	}
+	s.Container.Name = constants.InferenceServiceContainerName
+	s.Container.Args = append(args, s.Container.Args...)
+	return &s.Container
 }
 
 func (s *AIXExplainerSpec) Default(config *InferenceServicesConfig) {
@@ -103,13 +98,6 @@ func (s *AIXExplainerSpec) Default(config *InferenceServicesConfig) {
 		s.RuntimeVersion = proto.String(config.Explainers.AIXExplainer.DefaultImageVersion)
 	}
 	setResourceRequirementDefaults(&s.Resources)
-}
-
-// Validate the spec
-func (s *AIXExplainerSpec) Validate() error {
-	return utils.FirstNonNilError([]error{
-		validateStorageURI(s.GetStorageUri()),
-	})
 }
 
 func (s *AIXExplainerSpec) GetProtocol() constants.InferenceServiceProtocol {

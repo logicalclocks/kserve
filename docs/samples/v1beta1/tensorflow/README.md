@@ -1,6 +1,6 @@
 # Predict on an InferenceService with Tensorflow model
 ## Setup
-1. Your ~/.kube/config should point to a cluster with [KFServing installed](https://github.com/kubeflow/kfserving/blob/master/docs/DEVELOPER_GUIDE.md#deploy-kfserving).
+1. Your ~/.kube/config should point to a cluster with [KServe installed](https://github.com/kubeflow/kfserving/blob/master/docs/DEVELOPER_GUIDE.md#deploy-kfserving).
 2. Your cluster's Istio Ingress gateway must be network accessible.
 
 
@@ -16,7 +16,7 @@ metadata:
 spec:
   predictor:
     tensorflow:
-      storageUri: "gs://kfserving-samples/models/tensorflow/flowers"
+      storageUri: "gs://kfserving-examples/models/tensorflow/flowers"
 ```
 
 Apply the `tensorflow.yaml` to create the `InferenceService`.
@@ -42,7 +42,7 @@ The first step is to [determine the ingress IP and ports](../../../../README.md#
 MODEL_NAME=flower-sample
 INPUT_PATH=@./input.json
 SERVICE_HOSTNAME=$(kubectl get inferenceservice ${MODEL_NAME} -o jsonpath='{.status.url}' | cut -d "/" -f 3)
-curl -v -H "Host: ${SERVICE_HOSTNAME}" http://${INGRESS_HOST}:${INGRESS_PORT}/v1/models/$MODEL_NAME:predict -d $INPUT_PATH
+curl -v -H "Host: ${SERVICE_HOSTNAME}" "http://${INGRESS_HOST}:${INGRESS_PORT}/v1/models/$MODEL_NAME:predict" -d $INPUT_PATH
 ```
 
 Expected Output
@@ -89,7 +89,7 @@ spec:
   predictor:
     canaryTrafficPercent: 20
     tensorflow:
-      storageUri: "gs://kfserving-samples/models/tensorflow/flowers-2"
+      storageUri: "gs://kfserving-examples/models/tensorflow/flowers-2"
 ```
 
 ```
@@ -104,7 +104,7 @@ NAME            URL                                        READY   PREV   LATEST
 flower-sample   http://flower-sample.default.example.com   True    80     20       flower-sample-predictor-default-n9zs6   flower-sample-predictor-default-2kwtr   7m15s
 ```
 
-As you can see the traffic is split between the last rolled out revision and the current latest ready revision, KFServing automatically tracks the last rolled out(stable) revision for you so you
+As you can see the traffic is split between the last rolled out revision and the current latest ready revision, KServe automatically tracks the last rolled out(stable) revision for you so you
 do not need to maintain both default and canary on the `InferenceService` as in v1alpha2.
 
 
@@ -118,7 +118,7 @@ metadata:
 spec:
   predictor:
     tensorflow:
-      storageUri: "gs://kfserving-samples/models/tensorflow/flowers"
+      storageUri: "gs://kfserving-examples/models/tensorflow/flowers"
       ports:
         - containerPort: 9000
           name: h2c

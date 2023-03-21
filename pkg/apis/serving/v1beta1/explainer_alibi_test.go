@@ -1,4 +1,5 @@
 /*
+Copyright 2021 The KServe Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -68,35 +69,7 @@ func TestAlibiValidation(t *testing.T) {
 			spec: ExplainerSpec{
 				Alibi: &AlibiExplainerSpec{
 					ExplainerExtensionSpec: ExplainerExtensionSpec{
-						StorageURI: "hdfs://modelzoo",
-					},
-				},
-			},
-			matcher: gomega.Not(gomega.BeNil()),
-		},
-		"InvalidReplica": {
-			spec: ExplainerSpec{
-				ComponentExtensionSpec: ComponentExtensionSpec{
-					MinReplicas: GetIntReference(3),
-					MaxReplicas: 2,
-				},
-				Alibi: &AlibiExplainerSpec{
-					ExplainerExtensionSpec: ExplainerExtensionSpec{
-						StorageURI: "hdfs://modelzoo",
-					},
-				},
-			},
-			matcher: gomega.Not(gomega.BeNil()),
-		},
-		"InvalidContainerConcurrency": {
-			spec: ExplainerSpec{
-				ComponentExtensionSpec: ComponentExtensionSpec{
-					MinReplicas:          GetIntReference(3),
-					ContainerConcurrency: proto.Int64(-1),
-				},
-				Alibi: &AlibiExplainerSpec{
-					ExplainerExtensionSpec: ExplainerExtensionSpec{
-						StorageURI: "hdfs://modelzoo",
+						StorageURI: "invaliduri://modelzoo",
 					},
 				},
 			},

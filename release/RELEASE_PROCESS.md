@@ -28,10 +28,21 @@ Release branches serve several purposes:
 ## Publish the release
 It's generally a good idea to search the repo for control-f for strings of the old version number and replace them with the new, keeping in mind conflicts with other library version numbers.
 
-1. Update configmap to point to $VERSION for all images in the release branch.
-2. Update kserve and dependent python libraries to $VERSION in `setup.py`.
-3. Generate install manifest `./hack/generate-install.sh $VERSION`.
-4. Submit your PR and wait for it to merge.
-5. Once everything has settled, tag and push the release with `git tag $VERSION` and `git push upstream $VERSION`.
-6. KServe python sdk and images are published from github actions.
-7. Upload kserve install manifests to github release artifacts.
+
+1. Update the [VERSION](../python/VERSION) 
+2. Generate install manifest `./hack/generate-install.sh $VERSION`.
+3. Submit your PR and wait for it to merge.
+4. Once everything has settled, tag and push the release with `git tag $VERSION` and `git push upstream $VERSION`.
+5. KServe python sdk and images are published from github actions.
+6. Upload kserve install manifests to github release artifacts.
+
+## Cherry pick to release branch
+After the release-X.Y release branch is cut, pull requests(PRs) merged to master will be only get merged in the next minor release X.(Y+1).0
+
+If you want your PR released eariler in a patch release X.Y.(Z+1)
+- The PR must be merged to master
+- The PR should be a bug fix
+- The PR should be cherry picked to corresponding release branch release-X.Y:
+  Contributors should ask OWNERs who approved the PR to add a `cherrypick-approved` label if you want the PR cherry picked to release branch. Run `hack/cherry-pick.sh` script to cherry pick the
+  PRs and it runs `git cherry-pick` for each merged commit and add `cherrypicked` label on the PR. Once PR is cherry picked push to remote branch to create a PR to release branch.
+

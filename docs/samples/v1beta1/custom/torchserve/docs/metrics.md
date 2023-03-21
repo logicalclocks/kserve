@@ -1,10 +1,10 @@
 # Metrics
 
-This adds prometheus and granfana to the cluster with some default metrics.
+This adds prometheus and grafana to the cluster with some default metrics.
 
 ## Setup
 
-1. Your ~/.kube/config should point to a cluster with [KFServing installed](https://github.com/kubeflow/kfserving/#install-kfserving).
+1. Your ~/.kube/config should point to a cluster with [KServe installed](https://github.com/kserve/kserve#installation).
 2. Your cluster's Istio Ingress gateway must be [network accessible](https://istio.io/latest/docs/tasks/traffic-management/ingress/ingress-control/).
 
 ## Enable request metrics
@@ -100,7 +100,7 @@ $inferenceservice.serving.kserve.io/torchserve-custom created
 
 ## Run a prediction
 
-The first step is to [determine the ingress IP and ports](../../../../../../README.md#determine-the-ingress-ip-and-ports) and set `INGRESS_HOST` and `INGRESS_PORT`
+The first step is to [determine the ingress IP and ports](https://kserve.github.io/website/master/get_started/first_isvc/#4-determine-the-ingress-ip-and-ports) and set `INGRESS_HOST` and `INGRESS_PORT`
 
 ## Inference
 
@@ -117,7 +117,7 @@ Expected Output
 *   Trying 52.89.19.61...
 * Connected to a881f5a8c676a41edbccdb0a394a80d6-2069247558.us-west-2.elb.amazonaws.com (52.89.19.61) port 80 (#0)
 > PUT /predictions/mnist HTTP/1.1
-> Host: torchserve-custom.kfserving-test.example.com
+> Host: torchserve-custom.kserve-test.example.com
 > User-Agent: curl/7.47.0
 > Accept: */*
 > Content-Length: 272

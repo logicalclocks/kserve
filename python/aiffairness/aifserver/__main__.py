@@ -1,3 +1,4 @@
+# Copyright 2021 The KServe Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,6 +13,7 @@
 # limitations under the License.
 
 import argparse
+
 import kserve
 import json
 
@@ -19,8 +21,7 @@ from .model import AIFModel
 
 DEFAULT_MODEL_NAME = "aifserver"
 
-
-parser = argparse.ArgumentParser(parents=[kserve.kfserver.parser])
+parser = argparse.ArgumentParser(parents=[kserve.model_server.parser])
 
 parser.add_argument('--model_name',
                     default=DEFAULT_MODEL_NAME,
@@ -55,7 +56,6 @@ parser.add_argument('--unprivileged_groups',
                     nargs='+',
                     required=True)
 
-
 args, _ = parser.parse_known_args()
 
 if __name__ == "__main__":
@@ -70,4 +70,4 @@ if __name__ == "__main__":
         unprivileged_groups=args.unprivileged_groups
     )
     model.load()
-    kserve.KFServer().start([model], nest_asyncio=True)
+    kserve.ModelServer().start([model])

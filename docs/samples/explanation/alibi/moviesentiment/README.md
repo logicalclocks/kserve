@@ -1,15 +1,15 @@
-# Example Anchors Text Explaination for Movie Sentiment
+# Example Anchors Text Explanation for Movie Sentiment
 
 This example uses a [movie sentiment dataset](http://www.cs.cornell.edu/people/pabo/movie-review-data/).
 
-For a more visual rethrough please try the [Jupyter notebook](movie_review_explanations.ipynb).
+For a more visual run-through please try the [Jupyter notebook](movie_review_explanations.ipynb).
 
 We can create a InferenceService with a trained sklearn predictor for this dataset and an associated explainer. The black box explainer algorithm we will use is the Text version of Anchors from the [Alibi open source library](https://github.com/SeldonIO/alibi). More details on this algorithm and configuration settings that can be set can be found in the [Seldon Alibi documentation](https://docs.seldon.io/projects/alibi/en/stable/).
 
 The InferenceService is shown below:
 
 ```
-apiVersion: "serving.kserve.io/v1alpha2"
+apiVersion: "serving.kserve.io/v1beta1"
 kind: "InferenceService"
 metadata:
   name: "moviesentiment"
@@ -192,7 +192,7 @@ The returned explanation will be like:
 
 ```
 
-This shows the key word "bad" was indetified and examples show it in context using the default "UKN" placeholder for surrounding words.
+This shows the key word "bad" was identified and examples show it in context using the default "UKN" placeholder for surrounding words.
 
 
 ## Custom Configuration

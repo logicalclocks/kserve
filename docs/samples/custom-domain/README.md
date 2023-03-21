@@ -39,7 +39,7 @@ configmap/config-domain edited
 
 ## Create the Ingress resource
 
-#### Note: This step is only necessary if you are configuring a domain to route incoming traffic to a Kubernetes Ingress. For example, many cloud platforms provide default domains which route to a Kuberenetes Ingress. If you intend to route a domain directly to the `istio-ingressgateway`, you can skip this step.
+#### Note: This step is only necessary if you are configuring a domain to route incoming traffic to a Kubernetes Ingress. For example, many cloud platforms provide default domains which route to a Kubernetes Ingress. If you intend to route a domain directly to the `istio-ingressgateway`, you can skip this step.
 
 Edit the `kfserving-ingress.yaml` file to add your custom wildcard domain to the `spec.rules.host` section, replacing `<*.custom_domain>` with your custom wildcard domain. This is so that all incoming network traffic from your custom domain and any subdomain is routed to the `istio-ingressgateway`.
 
@@ -73,7 +73,7 @@ $ ingress.networking.k8s.io/kfserving-ingress created
 
 ## Verify 
 
-You can call your models using your custom top-level domain with the correct subdomain. For example if you deploy the sample [sklearn model](https://github.com/kubeflow/kfserving/tree/master/docs/samples/sklearn) in the `default` namespace using `customdomain.com`, you can reach it in the following way
+You can call your models using your custom top-level domain with the correct subdomain. For example if you deploy the sample [sklearn model](/docs/samples/v1beta1/sklearn/v1) in the `default` namespace using `customdomain.com`, you can reach it in the following way
 
 ```
 curl -v \

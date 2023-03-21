@@ -13,7 +13,7 @@ clf.fit(X, y)
 dump(clf, 'model.joblib')
 ```
 
-Then, we can install and run the [SKLearn Server](../../../../../python/sklearnserver) using the generated model and test for prediction. Models can be on local filesystem, S3 compatible object storage, Azure Blob Storage, or Google Cloud Storage.
+Then, we can install and run the [SKLearn Server](/python/sklearnserver) using the generated model and test for prediction. Models can be on local filesystem, S3 compatible object storage, Azure Blob Storage, or Google Cloud Storage.
 
 ```shell
 # we should indicate the directory containing the model file (model.joblib) by --model_dir
@@ -38,7 +38,7 @@ print(res.text)
 # Predict on an InferenceService using SKLearnServer
 
 ## Setup
-1. Your ~/.kube/config should point to a cluster with [KFServing installed](https://github.com/kubeflow/kfserving/#install-kfserving).
+1. Your ~/.kube/config should point to a cluster with [KServe installed](https://github.com/kserve/kserve#installation).
 2. Your cluster's Istio Ingress gateway must be [network accessible](https://istio.io/latest/docs/tasks/traffic-management/ingress/ingress-control/).
 
 ## Create the InferenceService
@@ -53,7 +53,7 @@ Expected Output
 $ inferenceservice.serving.kserve.io/sklearn-iris created
 ```
 ## Run a prediction
-The first step is to [determine the ingress IP and ports](https://github.com/kubeflow/kfserving#determine-the-ingress-ip-and-ports) and set `INGRESS_HOST` and `INGRESS_PORT`
+The first step is to [determine the ingress IP and ports](https://kserve.github.io/website/master/get_started/first_isvc/#4-determine-the-ingress-ip-and-ports) and set `INGRESS_HOST` and `INGRESS_PORT`
 
 ```
 MODEL_NAME=sklearn-iris
@@ -88,12 +88,12 @@ Expected Output
 ```
 
 ## Run SKLearn InferenceService with your own image
-Since the KFServing SKLearnServer image is built from a specific version of `scikit-learn` pip package, sometimes it might not be compatible with the pickled model
+Since the KServe SKLearnServer image is built from a specific version of `scikit-learn` pip package, sometimes it might not be compatible with the pickled model
 you saved from your training environment, however you can build your own SKLearnServer image following [these instructions](../../../../../python/sklearnserver/README.md#building-your-own-scikit-learn-server-docker-image
 ).
 
 To use your SKLearnServer image:
-- Add the image to the KFServing [configmap](../../../config/configmap/inferenceservice.yaml)
+- Add the image to the KServe [configmap](https://github.com/kserve/kserve/blob/master/config/configmap/inferenceservice.yaml)
 ```yaml
         "sklearn": {
             "image": "<your-dockerhub-id>/kfserving/sklearnserver",
@@ -108,6 +108,6 @@ metadata:
 spec:
   predictor:
     sklearn:
-      storageUri: "gs://kfserving-samples/models/sklearn/iris"
+      storageUri: "gs://kfserving-examples/models/sklearn/1.0/model"
       runtimeVersion: X.X.X
 ```

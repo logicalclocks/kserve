@@ -1,3 +1,4 @@
+# Copyright 2021 The KServe Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import kserve
+from kserve import Model, ModelServer
 from torchvision import models, transforms
 from typing import Dict
 import torch
@@ -23,20 +24,21 @@ from ray import serve
 
 # the model handle name should match the model endpoint name
 @serve.deployment(name="custom-model", num_replicas=2)
-class AlexNetModel(kserve.KFModel):
+class AlexNetModel(Model):
     def __init__(self):
         self.name = "custom-model"
         super().__init__(self.name)
+        self.model = None
+        self.ready = False
         self.load()
 
     def load(self):
-        model = models.alexnet(pretrained=True)
-        model.eval()
-        self.model = model
+        self.model = models.alexnet(pretrained=True)
+        self.model.eval()
         self.ready = True
 
-    async def predict(self, request: Dict) -> Dict:
-        inputs = request["instances"]
+    async def predict(self, payload: Dict, headers: Dict[str, str] = None) -> Dict:
+        inputs = payload["instances"]
 
         # Input follows the Tensorflow V1 HTTP API for binary values
         # https://www.tensorflow.org/tfx/serving/api_rest#encoding_binary_values
@@ -58,7 +60,7 @@ class AlexNetModel(kserve.KFModel):
 
         output = self.model(input_batch)
 
-        torch.nn.functional.softmax(output, dim=1)[0]
+        torch.nn.functional.softmax(output, dim=1)
 
         values, top_5 = torch.topk(output, 5)
 
@@ -66,4 +68,4 @@ class AlexNetModel(kserve.KFModel):
 
 
 if __name__ == "__main__":
-    kserve.KFServer(workers=1).start({"custom-model": AlexNetModel})
+    ModelServer().start({"custom-model": AlexNetModel})

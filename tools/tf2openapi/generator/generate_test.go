@@ -5,13 +5,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"net/http"
+	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/getkin/kin-openapi/openapi3filter"
+	"github.com/getkin/kin-openapi/routers/legacy"
 	"github.com/golang/protobuf/proto"
 	"github.com/onsi/gomega"
 
@@ -145,18 +146,18 @@ func TestGenerateOpenAPISpecGenerationErr(t *testing.T) {
 }
 
 func TestGenerateOpenAPIForRowFmtMultipleTensors(t *testing.T) {
-	// model src: gs://kfserving-samples/models/tensorflow/flowers
+	// model src: gs://kfserving-examples/models/tensorflow/flowers
 	g := gomega.NewGomegaWithT(t)
 	model := model(t, "TestRowFmtMultipleTensors")
 	generator := defaultGenerator()
 	spec, specErr := generator.GenerateOpenAPI(model)
 	g.Expect(specErr).Should(gomega.BeNil())
 
-	swagger := &openapi3.Swagger{}
+	swagger := &openapi3.T{}
 	g.Expect(json.Unmarshal([]byte(spec), &swagger)).To(gomega.Succeed())
 
 	expectedSpec := string(openAPI(t, "TestRowFmtMultipleTensors"))
-	expectedSwagger := &openapi3.Swagger{}
+	expectedSwagger := &openapi3.T{}
 	// remove any formatting from expectedSpec
 	buffer := new(bytes.Buffer)
 	if err := json.Compact(buffer, []byte(expectedSpec)); err != nil {
@@ -185,11 +186,11 @@ func TestGenerateOpenAPIForColFmtMultipleTensors(t *testing.T) {
 	spec, specErr := generator.GenerateOpenAPI(model)
 	g.Expect(specErr).Should(gomega.BeNil())
 
-	swagger := &openapi3.Swagger{}
+	swagger := &openapi3.T{}
 	g.Expect(json.Unmarshal([]byte(spec), &swagger)).To(gomega.Succeed())
 
 	expectedSpec := string(openAPI(t, "TestColFmtMultipleTensors"))
-	expectedSwagger := &openapi3.Swagger{}
+	expectedSwagger := &openapi3.T{}
 	// remove any formatting from expectedSpec
 	buffer := new(bytes.Buffer)
 	if err := json.Compact(buffer, []byte(expectedSpec)); err != nil {
@@ -261,7 +262,7 @@ func defaultGenerator() Generator {
 func model(t *testing.T, fName string) *pb.SavedModel {
 	model := &pb.SavedModel{}
 	fPath := filepath.Join("testdata", fName+".pb")
-	modelPb, err := ioutil.ReadFile(fPath)
+	modelPb, err := os.ReadFile(fPath)
 	if err != nil {
 		t.Fatalf("failed reading %s: %s", fPath, err)
 	}
@@ -273,7 +274,7 @@ func model(t *testing.T, fName string) *pb.SavedModel {
 
 func openAPI(t *testing.T, fName string) []byte {
 	fPath := filepath.Join("testdata", fName+".golden.json")
-	openAPI, err := ioutil.ReadFile(fPath)
+	openAPI, err := os.ReadFile(fPath)
 	if err != nil {
 		t.Fatalf("failed reading %s: %s", fPath, err)
 	}
@@ -281,13 +282,13 @@ func openAPI(t *testing.T, fName string) []byte {
 }
 
 func acceptsValidReq(t *testing.T, fName string) error {
-	router := openapi3filter.NewRouter().WithSwagger(loadSwagger(t, fName))
+	router, _ := legacy.NewRouter(loadSwagger(t, fName))
 	req, reqErr := http.NewRequest(http.MethodPost, "/v1/models/model/versions/1:predict",
 		bytes.NewReader(loadPayload(t, fName)))
 	if reqErr != nil {
 		t.Fatalf("error creating request: %s", reqErr)
 	}
-	route, pathParams, routeErr := router.FindRoute(req.Method, req.URL)
+	route, pathParams, routeErr := router.FindRoute(req)
 	if routeErr != nil {
 		t.Fatalf("error finding route: %s", routeErr)
 	}
@@ -300,9 +301,9 @@ func acceptsValidReq(t *testing.T, fName string) error {
 	return openapi3filter.ValidateRequest(context.TODO(), requestValidationInput)
 }
 
-func loadSwagger(t *testing.T, fName string) *openapi3.Swagger {
+func loadSwagger(t *testing.T, fName string) *openapi3.T {
 	fPath := filepath.Join("testdata", fName+".golden.json")
-	swagger, err := openapi3.NewSwaggerLoader().LoadSwaggerFromFile(fPath)
+	swagger, err := openapi3.NewLoader().LoadFromFile(fPath)
 	if err != nil {
 		t.Fatalf("failed reading %s: %s", fPath, err)
 	}
@@ -311,7 +312,7 @@ func loadSwagger(t *testing.T, fName string) *openapi3.Swagger {
 
 func loadPayload(t *testing.T, fName string) []byte {
 	fPath := filepath.Join("testdata", fName+"Req.json")
-	payload, err := ioutil.ReadFile(fPath)
+	payload, err := os.ReadFile(fPath)
 	if err != nil {
 		t.Fatalf("failed reading %s: %s", fPath, err)
 	}

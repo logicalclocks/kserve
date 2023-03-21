@@ -1,8 +1,12 @@
 /*
+Copyright 2021 The KServe Authors.
+
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
+
     http://www.apache.org/licenses/LICENSE-2.0
+
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -13,6 +17,10 @@ limitations under the License.
 package components
 
 import (
+	"fmt"
+	"net/url"
+	"time"
+
 	"github.com/go-logr/logr"
 	"github.com/kserve/kserve/pkg/constants"
 	"github.com/kserve/kserve/pkg/controller/v1beta1/inferenceservice/reconcilers/knative"
@@ -52,8 +60,8 @@ func NewTransformer(client client.Client, scheme *runtime.Scheme, inferenceServi
 }
 
 // Reconcile observes the world and attempts to drive the status towards the desired state.
-func (p *Transformer) Reconcile(isvc *v1beta1.InferenceService) error {
-	p.Log.Info("Reconciling Transformer", "TranformerSpec", isvc.Spec.Transformer)
+func (p *Transformer) Reconcile(isvc *v1beta1.InferenceService) (ctrl.Result, error) {
+	p.Log.Info("Reconciling Transformer", "TransformerSpec", isvc.Spec.Transformer)
 	transformer := isvc.Spec.Transformer.GetImplementation()
 	annotations := utils.Filter(isvc.Annotations, func(key string) bool {
 		return !utils.Includes(constants.ServiceAnnotationDisallowedList, key)
@@ -63,8 +71,13 @@ func (p *Transformer) Reconcile(isvc *v1beta1.InferenceService) error {
 	if sourceURI := transformer.GetStorageUri(); sourceURI != nil {
 		annotations[constants.StorageInitializerSourceUriInternalAnnotationKey] = *sourceURI
 	}
-	hasInferenceLogging := addLoggerAnnotations(isvc.Spec.Transformer.Logger, annotations)
-	hasInferenceBatcher := addBatcherAnnotations(isvc.Spec.Transformer.Batcher, annotations)
+	addLoggerAnnotations(isvc.Spec.Transformer.Logger, annotations)
+	addBatcherAnnotations(isvc.Spec.Transformer.Batcher, annotations)
+
+	deployConfig, err := v1beta1.NewDeployConfig(p.client)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
 
 	objectMeta := metav1.ObjectMeta{
 		Name:      constants.DefaultTransformerServiceName(isvc.Name),
@@ -75,6 +88,29 @@ func (p *Transformer) Reconcile(isvc *v1beta1.InferenceService) error {
 		}),
 		Annotations: annotations,
 	}
+
+	// Need to wait for predictor URL in modelmesh deployment mode
+	if isvcutils.GetDeploymentMode(annotations, deployConfig) == constants.ModelMeshDeployment {
+		// check if predictor URL is populated
+		predictorURL := (*url.URL)(isvc.Status.Components["predictor"].URL)
+		if predictorURL == nil {
+			// transformer reconcile will retry every 3 second until predictor URL is populated
+			p.Log.Info("Transformer reconciliation is waiting for predictor URL to be populated")
+			return ctrl.Result{RequeueAfter: 3 * time.Second}, nil
+		}
+
+		// add predictor host and protocol to metadata
+		isvc.ObjectMeta.Annotations[constants.PredictorHostAnnotationKey] = predictorURL.Host
+		if predictorURL.Scheme == "grpc" {
+			isvc.ObjectMeta.Annotations[constants.PredictorProtocolAnnotationKey] = string(constants.ProtocolGRPCV2)
+		} else if predictorURL.Scheme == "http" || predictorURL.Scheme == "https" {
+			// modelmesh supports v2 only
+			isvc.ObjectMeta.Annotations[constants.PredictorProtocolAnnotationKey] = string(constants.ProtocolV2)
+		} else {
+			return ctrl.Result{}, fmt.Errorf("Predictor URL Scheme not supported: %v", predictorURL.Scheme)
+		}
+	}
+
 	if len(isvc.Spec.Transformer.PodSpec.Containers) == 0 {
 		container := transformer.GetContainer(isvc.ObjectMeta, isvc.Spec.Transformer.GetExtensions(), p.inferenceServiceConfig)
 		isvc.Spec.Transformer.PodSpec = v1beta1.PodSpec{
@@ -87,40 +123,33 @@ func (p *Transformer) Reconcile(isvc *v1beta1.InferenceService) error {
 		isvc.Spec.Transformer.PodSpec.Containers[0] = *container
 	}
 
-	if hasInferenceLogging || hasInferenceBatcher {
-		addAgentContainerPort(&isvc.Spec.Transformer.PodSpec.Containers[0])
-	}
 	podSpec := corev1.PodSpec(isvc.Spec.Transformer.PodSpec)
 
-	deployConfig, err := v1beta1.NewDeployConfig(p.client)
-	if err != nil {
-		return err
-	}
 	// Here we allow switch between knative and vanilla deployment
 	if isvcutils.GetDeploymentMode(annotations, deployConfig) == constants.RawDeployment {
 		r, err := raw.NewRawKubeReconciler(p.client, p.scheme, objectMeta, &isvc.Spec.Transformer.ComponentExtensionSpec,
 			&podSpec)
 		if err != nil {
-			return errors.Wrapf(err, "fails to create NewRawKubeReconciler for transformer")
+			return ctrl.Result{}, errors.Wrapf(err, "fails to create NewRawKubeReconciler for transformer")
 		}
 		//set Deployment Controller
 		if err := controllerutil.SetControllerReference(isvc, r.Deployment.Deployment, p.scheme); err != nil {
-			return errors.Wrapf(err, "fails to set deployment owner reference for transformer")
+			return ctrl.Result{}, errors.Wrapf(err, "fails to set deployment owner reference for transformer")
 		}
 		//set Service Controller
 		if err := controllerutil.SetControllerReference(isvc, r.Service.Service, p.scheme); err != nil {
-			return errors.Wrapf(err, "fails to set service owner reference for transformer")
+			return ctrl.Result{}, errors.Wrapf(err, "fails to set service owner reference for transformer")
 		}
 		//set autoscaler Controller
 		if r.Scaler.Autoscaler.AutoscalerClass == constants.AutoscalerClassHPA {
 			if err := controllerutil.SetControllerReference(isvc, r.Scaler.Autoscaler.HPA.HPA, p.scheme); err != nil {
-				return errors.Wrapf(err, "fails to set HPA owner reference for transformer")
+				return ctrl.Result{}, errors.Wrapf(err, "fails to set HPA owner reference for transformer")
 			}
 		}
 
 		deployment, err := r.Reconcile()
 		if err != nil {
-			return errors.Wrapf(err, "fails to reoncile transformer")
+			return ctrl.Result{}, errors.Wrapf(err, "fails to reconcile transformer")
 		}
 		isvc.Status.PropagateRawStatus(v1beta1.TransformerComponent, deployment, r.URL)
 
@@ -128,14 +157,14 @@ func (p *Transformer) Reconcile(isvc *v1beta1.InferenceService) error {
 		r := knative.NewKsvcReconciler(p.client, p.scheme, objectMeta, &isvc.Spec.Transformer.ComponentExtensionSpec,
 			&podSpec, isvc.Status.Components[v1beta1.TransformerComponent])
 		if err := controllerutil.SetControllerReference(isvc, r.Service, p.scheme); err != nil {
-			return errors.Wrapf(err, "fails to set owner reference for predictor")
+			return ctrl.Result{}, errors.Wrapf(err, "fails to set owner reference for predictor")
 		}
 		status, err := r.Reconcile()
 		if err != nil {
-			return errors.Wrapf(err, "fails to reconcile predictor")
+			return ctrl.Result{}, errors.Wrapf(err, "fails to reconcile predictor")
 		}
 		isvc.Status.PropagateStatus(v1beta1.TransformerComponent, status)
 	}
 
-	return nil
+	return ctrl.Result{}, nil
 }

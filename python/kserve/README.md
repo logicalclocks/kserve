@@ -3,7 +3,7 @@ Python SDK for KServe Server and Client.
 
 ## Installation
 
-KFServing Python SDK can be installed by `pip` or `Setuptools`.
+KServe Python SDK can be installed by `pip` or `Setuptools`.
 
 ### pip install
 
@@ -54,6 +54,19 @@ It supports the following storage providers:
     * `https://<some_url>.com/model.joblib`
     * `http://<some_url>.com/model.joblib`
 
+### Metrics
+
+For latency metrics, send a request to `/metrics`. Prometheus latency histograms are emitted for each of the steps (pre/postprocessing, explain, predict).
+Additionally, the latencies of each step are logged per request.
+
+| Metric Name                       | Description                    | Type      |
+|-----------------------------------|--------------------------------|-----------| 
+| request_preprocess_seconds        | pre-processing request latency | Histogram | 
+| request_explain_seconds | explain request latency        | Histogram | 
+| request_predict_seconds | prediction request latency     | Histogram |
+| request_postprocess_seconds    | pre-processing request latency | Histogram | 
+
+
 ## KServe Client
 
 ### Getting Started
@@ -71,6 +84,13 @@ Please review [KServe Client API](https://github.com/kserve/website/blob/main/do
  - [KnativeURL](docs/KnativeURL.md)
  - [KnativeVolatileTime](docs/KnativeVolatileTime.md)
  - [NetUrlUserinfo](docs/NetUrlUserinfo.md)
+ - [V1alpha1InferenceGraph](docs/V1alpha1InferenceGraph.md)
+ - [V1alpha1InferenceGraphList](docs/V1alpha1InferenceGraphList.md)
+ - [V1alpha1InferenceGraphSpec](docs/V1alpha1InferenceGraphSpec.md)
+ - [V1alpha1InferenceGraphStatus](docs/V1alpha1InferenceGraphStatus.md)
+ - [V1alpha1InferenceRouter](docs/V1alpha1InferenceRouter.md)
+ - [V1alpha1InferenceStep](docs/V1alpha1InferenceStep.md)
+ - [V1alpha1InferenceTarget](docs/V1alpha1InferenceTarget.md)
  - [V1beta1AIXExplainerSpec](docs/V1beta1AIXExplainerSpec.md)
  - [V1beta1AlibiExplainerSpec](docs/V1beta1AlibiExplainerSpec.md)
  - [V1beta1Batcher](docs/V1beta1Batcher.md)

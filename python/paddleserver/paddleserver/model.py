@@ -1,3 +1,4 @@
+# Copyright 2021 The KServe Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,7 +19,7 @@ from paddle import inference
 import kserve
 
 
-class PaddleModel(kserve.KFModel):
+class PaddleModel(kserve.Model):
 
     def __init__(self, name: str, model_dir: str):
         super().__init__(name)
@@ -57,8 +58,8 @@ class PaddleModel(kserve.KFModel):
         self.ready = True
         return self.ready
 
-    def predict(self, request: Dict) -> Dict:
-        instances = request["instances"]
+    def predict(self, payload: Dict, headers: Dict[str, str] = None) -> Dict:
+        instances = payload["instances"]
         try:
             inputs = np.array(instances, dtype='float32')
         except Exception as e:

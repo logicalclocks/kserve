@@ -10,6 +10,7 @@ export ISVC_CONFIG_DIR="${CONFIG_DIR}/isvc"
 export KSVC_CONFIG_DIR="${CONFIG_DIR}/ksvc"
 
 CLEAN_KFSERVING="true"
+KFSERVING_NAMESPACE=${KFSERVING_NAMESPACE:-kfserving-system}
 
 # custom logger
 log() {
@@ -24,7 +25,7 @@ log() {
 isControllerRunning() {
     namespace=$1
     prefix="kserve"
-    if [ "${namespace}" == "kfserving-system" ]; then
+    if [ "${namespace}" == "${KFSERVING_NAMESPACE}" ]; then
         prefix="kfserving"
     fi
     svc_names=$(kubectl get svc -n $namespace -o jsonpath='{.items[*].metadata.name}')
@@ -51,7 +52,7 @@ fi
 
 # Checks whether the kfserving is running or not
 log INFO "checking whether kfserving is running or not"
-isControllerRunning kfserving-system
+isControllerRunning "${KFSERVING_NAMESPACE}"
 
 # Checks whether the kserve is running or not
 log INFO "checking whether kserve is running or not"
@@ -102,23 +103,23 @@ ksvc_count=${#ksvc_names[@]}
 (
     # Stop kfserving controller
     log INFO "stopping kfserving controller"
-    kubectl scale --replicas=0 statefulset.apps kfserving-controller-manager -n kfserving-system
+    kubectl scale --replicas=0 statefulset.apps kfserving-controller-manager -n "${KFSERVING_NAMESPACE}"
     sleep 30
 
-    trap 'kubectl scale --replicas=1 statefulset.apps kfserving-controller-manager -n kfserving-system' ERR
+    trap 'kubectl scale --replicas=1 statefulset.apps kfserving-controller-manager -n ${KFSERVING_NAMESPACE}' ERR
 
     # Deploy inference services on kserve
     log INFO "deploying inference services on kserve"
     for (( i=0; i<${isvc_count}; i++ ));
     do
-        yq d -i "${ISVC_CONFIG_DIR}/${isvc_names[$i]}.yaml" 'metadata.annotations[kubectl.kubernetes.io/last-applied-configuration]'
-        yq d -i "${ISVC_CONFIG_DIR}/${isvc_names[$i]}.yaml" 'metadata.creationTimestamp'
-        yq d -i "${ISVC_CONFIG_DIR}/${isvc_names[$i]}.yaml" 'metadata.finalizers'
-        yq d -i "${ISVC_CONFIG_DIR}/${isvc_names[$i]}.yaml" 'metadata.generation'
-        yq d -i "${ISVC_CONFIG_DIR}/${isvc_names[$i]}.yaml" 'metadata.resourceVersion'
-        yq d -i "${ISVC_CONFIG_DIR}/${isvc_names[$i]}.yaml" 'metadata.uid'
-        yq d -i "${ISVC_CONFIG_DIR}/${isvc_names[$i]}.yaml" 'metadata.managedFields'
-        yq d -i "${ISVC_CONFIG_DIR}/${isvc_names[$i]}.yaml" 'status'
+        yq 'del(.metadata.annotations[kubectl.kubernetes.io/last-applied-configuration])' -i "${ISVC_CONFIG_DIR}/${isvc_names[$i]}.yaml"
+        yq 'del(.metadata.creationTimestamp)' -i "${ISVC_CONFIG_DIR}/${isvc_names[$i]}.yaml"
+        yq 'del(.metadata.finalizers)' -i "${ISVC_CONFIG_DIR}/${isvc_names[$i]}.yaml"
+        yq 'del(.metadata.generation)' -i "${ISVC_CONFIG_DIR}/${isvc_names[$i]}.yaml"
+        yq 'del(.metadata.resourceVersion)' -i "${ISVC_CONFIG_DIR}/${isvc_names[$i]}.yaml"
+        yq 'del(.metadata.uid)' -i "${ISVC_CONFIG_DIR}/${isvc_names[$i]}.yaml"
+        yq 'del(.metadata.managedFields)' -i "${ISVC_CONFIG_DIR}/${isvc_names[$i]}.yaml"
+        yq 'del(.status)' -i "${ISVC_CONFIG_DIR}/${isvc_names[$i]}.yaml"
         sed -i -- 's/kubeflow.org/kserve.io/g' ${ISVC_CONFIG_DIR}/${isvc_names[$i]}.yaml
         kubectl apply -f "${ISVC_CONFIG_DIR}/${isvc_names[$i]}.yaml"
     done
@@ -194,7 +195,7 @@ done
 
 # Start kfserving controller for clean up
 log INFO "starting kfserving controller for clean up"
-kubectl scale --replicas=1 statefulset.apps kfserving-controller-manager -n kfserving-system
+kubectl scale --replicas=1 statefulset.apps kfserving-controller-manager -n "${KFSERVING_NAMESPACE}"
 
 # Delete inference services running on kfserving
 log INFO "deleting inference services on kfserving"
@@ -206,7 +207,10 @@ done
 # Clean up kfserving
 if [ "${CLEAN_KFSERVING}" == "true" ]; then
     log INFO "deleting kfserving namespace"
-    kubectl delete ns kfserving-system
+
+    if [ "${KFSERVING_NAMESPACE}" != "kubeflow" ]; then
+      kubectl delete ns "${KFSERVING_NAMESPACE}"
+    fi
 
     log INFO "deleting kfserving cluster role and cluster role binding"
     kubectl delete ClusterRoleBinding kfserving-manager-rolebinding

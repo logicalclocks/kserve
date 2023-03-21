@@ -1,3 +1,4 @@
+# Copyright 2022 The KServe Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -54,7 +55,6 @@ class V1beta1TorchServeSpec(object):
         'image_pull_policy': 'str',
         'lifecycle': 'V1Lifecycle',
         'liveness_probe': 'V1Probe',
-        'model_class_name': 'str',
         'name': 'str',
         'ports': 'list[V1ContainerPort]',
         'protocol_version': 'str',
@@ -65,6 +65,7 @@ class V1beta1TorchServeSpec(object):
         'startup_probe': 'V1Probe',
         'stdin': 'bool',
         'stdin_once': 'bool',
+        'storage': 'V1beta1StorageSpec',
         'storage_uri': 'str',
         'termination_message_path': 'str',
         'termination_message_policy': 'str',
@@ -83,7 +84,6 @@ class V1beta1TorchServeSpec(object):
         'image_pull_policy': 'imagePullPolicy',
         'lifecycle': 'lifecycle',
         'liveness_probe': 'livenessProbe',
-        'model_class_name': 'modelClassName',
         'name': 'name',
         'ports': 'ports',
         'protocol_version': 'protocolVersion',
@@ -94,6 +94,7 @@ class V1beta1TorchServeSpec(object):
         'startup_probe': 'startupProbe',
         'stdin': 'stdin',
         'stdin_once': 'stdinOnce',
+        'storage': 'storage',
         'storage_uri': 'storageUri',
         'termination_message_path': 'terminationMessagePath',
         'termination_message_policy': 'terminationMessagePolicy',
@@ -103,7 +104,7 @@ class V1beta1TorchServeSpec(object):
         'working_dir': 'workingDir'
     }
 
-    def __init__(self, args=None, command=None, env=None, env_from=None, image=None, image_pull_policy=None, lifecycle=None, liveness_probe=None, model_class_name=None, name=None, ports=None, protocol_version=None, readiness_probe=None, resources=None, runtime_version=None, security_context=None, startup_probe=None, stdin=None, stdin_once=None, storage_uri=None, termination_message_path=None, termination_message_policy=None, tty=None, volume_devices=None, volume_mounts=None, working_dir=None, local_vars_configuration=None):  # noqa: E501
+    def __init__(self, args=None, command=None, env=None, env_from=None, image=None, image_pull_policy=None, lifecycle=None, liveness_probe=None, name='', ports=None, protocol_version=None, readiness_probe=None, resources=None, runtime_version=None, security_context=None, startup_probe=None, stdin=None, stdin_once=None, storage=None, storage_uri=None, termination_message_path=None, termination_message_policy=None, tty=None, volume_devices=None, volume_mounts=None, working_dir=None, local_vars_configuration=None):  # noqa: E501
         """V1beta1TorchServeSpec - a model defined in OpenAPI"""  # noqa: E501
         if local_vars_configuration is None:
             local_vars_configuration = Configuration()
@@ -117,7 +118,6 @@ class V1beta1TorchServeSpec(object):
         self._image_pull_policy = None
         self._lifecycle = None
         self._liveness_probe = None
-        self._model_class_name = None
         self._name = None
         self._ports = None
         self._protocol_version = None
@@ -128,6 +128,7 @@ class V1beta1TorchServeSpec(object):
         self._startup_probe = None
         self._stdin = None
         self._stdin_once = None
+        self._storage = None
         self._storage_uri = None
         self._termination_message_path = None
         self._termination_message_policy = None
@@ -153,8 +154,6 @@ class V1beta1TorchServeSpec(object):
             self.lifecycle = lifecycle
         if liveness_probe is not None:
             self.liveness_probe = liveness_probe
-        if model_class_name is not None:
-            self.model_class_name = model_class_name
         if name is not None:
             self.name = name
         if ports is not None:
@@ -175,6 +174,8 @@ class V1beta1TorchServeSpec(object):
             self.stdin = stdin
         if stdin_once is not None:
             self.stdin_once = stdin_once
+        if storage is not None:
+            self.storage = storage
         if storage_uri is not None:
             self.storage_uri = storage_uri
         if termination_message_path is not None:
@@ -194,7 +195,7 @@ class V1beta1TorchServeSpec(object):
     def args(self):
         """Gets the args of this V1beta1TorchServeSpec.  # noqa: E501
 
-        Arguments to the entrypoint. The docker image's CMD is used if this is not provided. Variable references $(VAR_NAME) are expanded using the container's environment. If a variable cannot be resolved, the reference in the input string will be unchanged. The $(VAR_NAME) syntax can be escaped with a double $$, ie: $$(VAR_NAME). Escaped references will never be expanded, regardless of whether the variable exists or not. Cannot be updated. More info: https://kubernetes.io/docs/tasks/inject-data-application/define-command-argument-container/#running-a-command-in-a-shell  # noqa: E501
+        Arguments to the entrypoint. The docker image's CMD is used if this is not provided. Variable references $(VAR_NAME) are expanded using the container's environment. If a variable cannot be resolved, the reference in the input string will be unchanged. Double $$ are reduced to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e. \"$$(VAR_NAME)\" will produce the string literal \"$(VAR_NAME)\". Escaped references will never be expanded, regardless of whether the variable exists or not. Cannot be updated. More info: https://kubernetes.io/docs/tasks/inject-data-application/define-command-argument-container/#running-a-command-in-a-shell  # noqa: E501
 
         :return: The args of this V1beta1TorchServeSpec.  # noqa: E501
         :rtype: list[str]
@@ -205,7 +206,7 @@ class V1beta1TorchServeSpec(object):
     def args(self, args):
         """Sets the args of this V1beta1TorchServeSpec.
 
-        Arguments to the entrypoint. The docker image's CMD is used if this is not provided. Variable references $(VAR_NAME) are expanded using the container's environment. If a variable cannot be resolved, the reference in the input string will be unchanged. The $(VAR_NAME) syntax can be escaped with a double $$, ie: $$(VAR_NAME). Escaped references will never be expanded, regardless of whether the variable exists or not. Cannot be updated. More info: https://kubernetes.io/docs/tasks/inject-data-application/define-command-argument-container/#running-a-command-in-a-shell  # noqa: E501
+        Arguments to the entrypoint. The docker image's CMD is used if this is not provided. Variable references $(VAR_NAME) are expanded using the container's environment. If a variable cannot be resolved, the reference in the input string will be unchanged. Double $$ are reduced to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e. \"$$(VAR_NAME)\" will produce the string literal \"$(VAR_NAME)\". Escaped references will never be expanded, regardless of whether the variable exists or not. Cannot be updated. More info: https://kubernetes.io/docs/tasks/inject-data-application/define-command-argument-container/#running-a-command-in-a-shell  # noqa: E501
 
         :param args: The args of this V1beta1TorchServeSpec.  # noqa: E501
         :type: list[str]
@@ -217,7 +218,7 @@ class V1beta1TorchServeSpec(object):
     def command(self):
         """Gets the command of this V1beta1TorchServeSpec.  # noqa: E501
 
-        Entrypoint array. Not executed within a shell. The docker image's ENTRYPOINT is used if this is not provided. Variable references $(VAR_NAME) are expanded using the container's environment. If a variable cannot be resolved, the reference in the input string will be unchanged. The $(VAR_NAME) syntax can be escaped with a double $$, ie: $$(VAR_NAME). Escaped references will never be expanded, regardless of whether the variable exists or not. Cannot be updated. More info: https://kubernetes.io/docs/tasks/inject-data-application/define-command-argument-container/#running-a-command-in-a-shell  # noqa: E501
+        Entrypoint array. Not executed within a shell. The docker image's ENTRYPOINT is used if this is not provided. Variable references $(VAR_NAME) are expanded using the container's environment. If a variable cannot be resolved, the reference in the input string will be unchanged. Double $$ are reduced to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e. \"$$(VAR_NAME)\" will produce the string literal \"$(VAR_NAME)\". Escaped references will never be expanded, regardless of whether the variable exists or not. Cannot be updated. More info: https://kubernetes.io/docs/tasks/inject-data-application/define-command-argument-container/#running-a-command-in-a-shell  # noqa: E501
 
         :return: The command of this V1beta1TorchServeSpec.  # noqa: E501
         :rtype: list[str]
@@ -228,7 +229,7 @@ class V1beta1TorchServeSpec(object):
     def command(self, command):
         """Sets the command of this V1beta1TorchServeSpec.
 
-        Entrypoint array. Not executed within a shell. The docker image's ENTRYPOINT is used if this is not provided. Variable references $(VAR_NAME) are expanded using the container's environment. If a variable cannot be resolved, the reference in the input string will be unchanged. The $(VAR_NAME) syntax can be escaped with a double $$, ie: $$(VAR_NAME). Escaped references will never be expanded, regardless of whether the variable exists or not. Cannot be updated. More info: https://kubernetes.io/docs/tasks/inject-data-application/define-command-argument-container/#running-a-command-in-a-shell  # noqa: E501
+        Entrypoint array. Not executed within a shell. The docker image's ENTRYPOINT is used if this is not provided. Variable references $(VAR_NAME) are expanded using the container's environment. If a variable cannot be resolved, the reference in the input string will be unchanged. Double $$ are reduced to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e. \"$$(VAR_NAME)\" will produce the string literal \"$(VAR_NAME)\". Escaped references will never be expanded, regardless of whether the variable exists or not. Cannot be updated. More info: https://kubernetes.io/docs/tasks/inject-data-application/define-command-argument-container/#running-a-command-in-a-shell  # noqa: E501
 
         :param command: The command of this V1beta1TorchServeSpec.  # noqa: E501
         :type: list[str]
@@ -371,29 +372,6 @@ class V1beta1TorchServeSpec(object):
         self._liveness_probe = liveness_probe
 
     @property
-    def model_class_name(self):
-        """Gets the model_class_name of this V1beta1TorchServeSpec.  # noqa: E501
-
-        When this field is specified KFS chooses the KFServer implementation, otherwise KFS uses the TorchServe implementation  # noqa: E501
-
-        :return: The model_class_name of this V1beta1TorchServeSpec.  # noqa: E501
-        :rtype: str
-        """
-        return self._model_class_name
-
-    @model_class_name.setter
-    def model_class_name(self, model_class_name):
-        """Sets the model_class_name of this V1beta1TorchServeSpec.
-
-        When this field is specified KFS chooses the KFServer implementation, otherwise KFS uses the TorchServe implementation  # noqa: E501
-
-        :param model_class_name: The model_class_name of this V1beta1TorchServeSpec.  # noqa: E501
-        :type: str
-        """
-
-        self._model_class_name = model_class_name
-
-    @property
     def name(self):
         """Gets the name of this V1beta1TorchServeSpec.  # noqa: E501
 
@@ -443,7 +421,7 @@ class V1beta1TorchServeSpec(object):
     def protocol_version(self):
         """Gets the protocol_version of this V1beta1TorchServeSpec.  # noqa: E501
 
-        Protocol version to use by the predictor (i.e. v1 or v2)  # noqa: E501
+        Protocol version to use by the predictor (i.e. v1 or v2 or grpc-v1 or grpc-v2)  # noqa: E501
 
         :return: The protocol_version of this V1beta1TorchServeSpec.  # noqa: E501
         :rtype: str
@@ -454,7 +432,7 @@ class V1beta1TorchServeSpec(object):
     def protocol_version(self, protocol_version):
         """Sets the protocol_version of this V1beta1TorchServeSpec.
 
-        Protocol version to use by the predictor (i.e. v1 or v2)  # noqa: E501
+        Protocol version to use by the predictor (i.e. v1 or v2 or grpc-v1 or grpc-v2)  # noqa: E501
 
         :param protocol_version: The protocol_version of this V1beta1TorchServeSpec.  # noqa: E501
         :type: str
@@ -614,6 +592,27 @@ class V1beta1TorchServeSpec(object):
         """
 
         self._stdin_once = stdin_once
+
+    @property
+    def storage(self):
+        """Gets the storage of this V1beta1TorchServeSpec.  # noqa: E501
+
+
+        :return: The storage of this V1beta1TorchServeSpec.  # noqa: E501
+        :rtype: V1beta1StorageSpec
+        """
+        return self._storage
+
+    @storage.setter
+    def storage(self, storage):
+        """Sets the storage of this V1beta1TorchServeSpec.
+
+
+        :param storage: The storage of this V1beta1TorchServeSpec.  # noqa: E501
+        :type: V1beta1StorageSpec
+        """
+
+        self._storage = storage
 
     @property
     def storage_uri(self):

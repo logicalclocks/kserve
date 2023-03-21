@@ -1,3 +1,4 @@
+# Copyright 2021 The KServe Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,12 +13,12 @@
 # limitations under the License.
 
 from alibi.api.interfaces import Explanation
-from typing import List, Optional
+from typing import List, Optional, Dict
 
 
 class ExplainerWrapper:
     def validate(self, training_data_url: Optional[str]):
         pass
 
-    def explain(self, inputs: List) -> Explanation:
+    def explain(self, inputs: List, headers: Dict[str, str] = None) -> Explanation:
         pass
