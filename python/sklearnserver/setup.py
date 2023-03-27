@@ -38,7 +38,7 @@ setup(
     install_requires=[
         f"kserve>={version}",
         "scikit-learn == 1.1.1",
-        "joblib >= 1.2.0",
+        "joblib == 1.2.0",
         "pandas >= 1.3.5"
     ],
     tests_require=tests_require,
