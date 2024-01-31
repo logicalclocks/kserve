@@ -17,12 +17,108 @@ from typing import Optional, List, Dict
 import numpy
 import numpy as np
 import pandas as pd
-from tritonclient.utils import raise_error, serialize_byte_tensor
 
 from ..constants.constants import GRPC_CONTENT_DATATYPE_MAPPINGS
 from ..errors import InvalidInput
 from ..protocol.grpc.grpc_predict_v2_pb2 import ModelInferRequest, InferTensorContents, ModelInferResponse
 from ..utils.numpy_codec import to_np_dtype, from_np_dtype
+
+
+def raise_error(msg):
+    """
+    Raise error with the provided message
+    """
+    raise InferenceServerException(msg=msg) from None
+
+
+def serialized_byte_size(tensor_value):
+    """
+    Get the underlying number of bytes for a numpy ndarray.
+
+    Parameters
+    ----------
+    tensor_value : numpy.ndarray
+        Numpy array to calculate the number of bytes for.
+
+    Returns
+    -------
+    int
+        Number of bytes present in this tensor
+    """
+
+    if tensor_value.dtype != np.object_:
+        raise_error("The tensor_value dtype must be np.object_")
+
+    if tensor_value.size > 0:
+        total_bytes = 0
+        # 'C' order is row-major.
+        for obj in np.nditer(tensor_value, flags=["refs_ok"], order="C"):
+            total_bytes += len(obj.item())
+        return total_bytes
+    else:
+        return 0
+
+
+class InferenceServerException(Exception):
+    """Exception indicating non-Success status.
+
+    Parameters
+    ----------
+    msg : str
+        A brief description of error
+
+    status : str
+        The error code
+
+    debug_details : str
+        The additional details on the error
+
+    """
+
+    def __init__(self, msg, status=None, debug_details=None):
+        self._msg = msg
+        self._status = status
+        self._debug_details = debug_details
+
+    def __str__(self):
+        msg = super().__str__() if self._msg is None else self._msg
+        if self._status is not None:
+            msg = "[" + self._status + "] " + msg
+        return msg
+
+    def message(self):
+        """Get the exception message.
+
+        Returns
+        -------
+        str
+            The message associated with this exception, or None if no message.
+
+        """
+        return self._msg
+
+    def status(self):
+        """Get the status of the exception.
+
+        Returns
+        -------
+        str
+            Returns the status of the exception
+
+        """
+        return self._status
+
+    def debug_details(self):
+        """Get the detailed information about the exception
+        for debugging purposes
+
+        Returns
+        -------
+        str
+            Returns the exception details
+
+        """
+        return self._debug_details
 
 
 class InferInput:
