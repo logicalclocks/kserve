@@ -1,0 +1,7 @@
+[
+    {
+        "name": "hopsworks/sklearnserver",
+        "version": "env:VERSION",
+        "dockerFile": "python/sklearn.Dockerfile"
+    }
+]
