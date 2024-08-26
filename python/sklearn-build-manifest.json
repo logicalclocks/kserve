@@ -1,8 +1,7 @@
 [
-  {
-    "name": "hopsworks/sklearnserver",
-    "version": "env:VERSION",
-    "dockerFile": "python/sklearn.Dockerfile",
-    "changeDirectory": "false"
-  }
+    {
+        "name": "hopsworks/sklearnserver",
+        "version": "env:VERSION",
+        "dockerFile": "python/sklearn.Dockerfile"
+    }
 ]
