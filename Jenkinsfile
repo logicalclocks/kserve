@@ -5,13 +5,13 @@ import com.logicalclocks.jenkins.k8s.ImageBuilder
 properties([
   parameters([
     choice(name: 'image', choices: ['all', 'sklearnserver'],  description: 'Which docker image to build'),
-    choice(name: 'branch', choices: ['', 'master', 'release-0.11.2', 'release-0.14.0'],  description: 'Which branch to build'),
+    choice(name: 'branch', choices: ['', 'release-0.11.2', 'release-0.14.0'],  description: 'Which branch to build'),
   ])
 ])
 
 node("local") {
     stage('Clone repository') {
-      if (params.branch == '' || params.branch == 'master'){
+      if (params.branch == ''){
         checkout scm
       } else {
         sshagent (credentials: ['id_rsa']) {
