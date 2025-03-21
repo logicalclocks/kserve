@@ -5,7 +5,7 @@ import com.logicalclocks.jenkins.k8s.ImageBuilder
 properties([
   parameters([
     choice(name: 'image', choices: ['all', 'sklearnserver'],  description: 'Which docker image to build'),
-    choice(name: 'branch', choices: ['', 'release-0.11.2', 'release-0.14.0'],  description: 'Which branch to build'),
+    choice(name: 'branch', choices: ['', 'release-0.11.2', 'release-0.14.0', 'release-0.14.1', 'release-0.14.2'],  description: 'Which branch to build'),
   ])
 ])
 

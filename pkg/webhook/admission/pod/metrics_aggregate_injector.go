@@ -66,11 +66,15 @@ func setMetricAggregationEnvVarsAndPorts(pod *v1.Pod) {
 
 			// The kserve container port/path is set as an EnvVar in the queue-proxy container
 			// so that it knows which port/path to scrape from the kserve-container.
-			pod.Spec.Containers[i].Env = append(pod.Spec.Containers[i].Env, v1.EnvVar{Name: constants.KServeContainerPrometheusMetricsPortEnvVarKey, Value: kserveContainerPromPort})
-			pod.Spec.Containers[i].Env = append(pod.Spec.Containers[i].Env, v1.EnvVar{Name: constants.KServeContainerPrometheusMetricsPathEnvVarKey, Value: kserveContainerPromPath})
+			pod.Spec.Containers[i].Env = utils.MergeEnvs(pod.Spec.Containers[i].Env, []v1.EnvVar{
+				{Name: constants.KServeContainerPrometheusMetricsPortEnvVarKey, Value: kserveContainerPromPort},
+				{Name: constants.KServeContainerPrometheusMetricsPathEnvVarKey, Value: kserveContainerPromPath},
+			})
 
 			// Set the port that queue-proxy will use to expose the aggregate metrics.
-			pod.Spec.Containers[i].Env = append(pod.Spec.Containers[i].Env, v1.EnvVar{Name: constants.QueueProxyAggregatePrometheusMetricsPortEnvVarKey, Value: strconv.Itoa(constants.QueueProxyAggregatePrometheusMetricsPort)})
+			pod.Spec.Containers[i].Env = utils.MergeEnvs(pod.Spec.Containers[i].Env, []v1.EnvVar{
+				{Name: constants.QueueProxyAggregatePrometheusMetricsPortEnvVarKey, Value: strconv.Itoa(constants.QueueProxyAggregatePrometheusMetricsPort)},
+			})
 
 			pod.Spec.Containers[i].Ports = utils.AppendPortIfNotExists(pod.Spec.Containers[i].Ports, v1.ContainerPort{
 				Name:          constants.AggregateMetricsPortName,
