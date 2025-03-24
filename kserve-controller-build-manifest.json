@@ -1,0 +1,6 @@
+[
+  {
+    "name": "hopsworks/kserve-controller",
+    "version": "env:VERSION"
+  }
+]
