@@ -10,9 +10,10 @@ packages = [
 ]
 
 [tool.poetry.dependencies]
-python = ">=3.8,<3.12"
+python = ">=3.9,<3.12"
 kserve = {path = "../kserve", extras = ["storage"], develop = true}
-paddlepaddle = {version="^2.6.1", markers = "platform_system != 'Windows'"}
+paddlepaddle = {version="^2.6.2", markers = "platform_system != 'Windows'"}
+setuptools = "^70.0.0"
 
 [tool.poetry.group.test]
 optional = true
