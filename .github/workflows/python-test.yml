@@ -250,3 +250,62 @@ jobs:
       - name: Free space after tests
         run: |
           df -hT
+
+  build-py312:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.12"]
+    name: Build kserve client on Python 3.12
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Free-up disk space
+        uses: ./.github/actions/free-up-disk-space
+
+      - name: Set up Python ${{ matrix.python-version }}
+        id: setup-python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install Poetry and version plugin
+        run: ./test/scripts/gh-actions/setup-poetry.sh
+
+      - name: Configure Poetry cache
+        run: |
+          sudo mkdir -p /mnt/poetry
+          sudo chown -R $USER /mnt/poetry
+          poetry config cache-dir /mnt/poetry
+
+      - name: Load poetry cache
+        id: cached-poetry-dependencies
+        uses: actions/cache@v4
+        with:
+          path: /mnt/poetry
+          key: poetry-${{ steps.setup-python.outputs.python-version }}-${{ hashFiles('**/poetry.lock') }}
+
+      - name: Load cached kserve venv
+        id: cached-kserve-dependencies
+        uses: actions/cache@v4
+        with:
+          path: python/kserve/.venv
+          key: kserve-venv-${{ steps.setup-python.outputs.python-version }}-${{ hashFiles('**/kserve/poetry.lock') }}
+
+      - name: Install kserve dependencies
+        if: steps.cached-kserve-dependencies.outputs.cache-hit != 'true'
+        run: |
+          cd python/kserve
+          make install_dependencies
+
+      - name: Install kserve
+        run: |
+          cd python/kserve
+          make dev_install
+
+      - name: Test kserve
+        run: |
+          cd python
+          source kserve/.venv/bin/activate
+          pytest --cov=kserve ./kserve
