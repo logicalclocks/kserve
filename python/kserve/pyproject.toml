@@ -8,8 +8,12 @@ license = {text = "Apache-2.0"}
 requires-python = ">=3.10,<3.13"
 dependencies = [
     "uvicorn[standard]<1.0.0,>=0.30.6",
-    "fastapi>=0.115.3",
-    "starlette==0.49.1",
+    # <0.137: fastapi 0.137.0 adds _IncludedRouter entries to the router table,
+    # which crashes timing_asgi's StarletteScopeToName on every request
+    # (AttributeError: no attribute 'endpoint'). 0.136.x is also what upstream
+    # release-0.20 locks.
+    "fastapi>=0.115.3,<0.137",
+    "starlette>=1.0.1,<2.0.0", # CVE-2026-48710 Starlette: Security restriction bypass via malformed HTTP Host header
     "cloudevents<2.0.0,>=1.6.2",
     "six<2.0.0,>=1.16.0",
     "kubernetes>=23.3.0",
@@ -28,17 +32,20 @@ dependencies = [
     "pandas<3.0.0,>=2.2.0",
     "pydantic<3.0.0,>=2.5.0",
     "pyyaml<7.0.0,>=6.0.0",
-    "urllib3>=2.6.0", # CVE-2025-66418 https://github.com/urllib3/urllib3/security/advisories/GHSA-gm62-xv2j-4w53
-    "aiohttp>=3.13.3", # CVE-2025-69223 AIOHTTP's HTTP Parser auto_decompress feature is vulnerable to zip bomb
+    "urllib3>=2.7.0", # CVE-2025-66418 https://github.com/urllib3/urllib3/security/advisories/GHSA-gm62-xv2j-4w53
+    "aiohttp>=3.14.3", # CVE-2025-69223 AIOHTTP's HTTP Parser auto_decompress feature is vulnerable to zip bomb
     "h11>=0.16.0", # CVE-2025-43859 h11 accepts some malformed Chunked-Encoding bodies
-    "cryptography>=46.0.5", # CVE-2026-26007 cryptography Subgroup Attack Due to Missing Subgroup Validation for SECT Curves
-    "python-multipart>=0.0.22", # CVE-2026-24486 Python-Multipart has Arbitrary File Write via Non-Default Configuration
+    "cryptography>=50.0.0", # CVE-2026-26007 cryptography Subgroup Attack Due to Missing Subgroup Validation for SECT Curves
+    "python-multipart>=0.0.30", # CVE-2026-24486 Python-Multipart has Arbitrary File Write via Non-Default Configuration
     # CVE-2026-32597 PyJWT accepts unknown `crit` header extensions (RFC 7515 §4.1.11 MUST violation)
     # Pinning because it is a transitive dependency.
-    "pyjwt>=2.12.0",
+    "pyjwt>=2.13.0",
     # CVE-2026-30922 pyasn1 Vulnerable to Denial of Service via Unbounded Recursion
     # Pinning because it is a transitive dependency.
-    "pyasn1>=0.6.3"
+    "pyasn1>=0.6.4",
+    # CVE-2026-45409 idna DoS via crafted bidirectional labels
+    # Pinning because it is a transitive dependency.
+    "idna>=3.15"
 ]
 name = "kserve"
 version = "0.19.0"
@@ -97,7 +104,7 @@ test = [
     "pyarrow>=18.0.0,<20.0.0",
 ]
 dev = [
-    "black[colorama]~=24.3.0",
+    "black[colorama]~=26.3.1",
 ]
 
 [tool.uv]
@@ -105,6 +112,10 @@ dev = [
 index-url = "https://test.pypi.org/simple/"
 extra-index-url = ["https://pypi.org/simple"]
 index-strategy = "unsafe-best-match"
+# unsafe-best-match can resolve to squatted test.pypi uploads (v100.0.0 etc.);
+# keep this vllm transitive on its real release series. 8.x is the fence:
+# 7.x caps starlette<1.0, unresolvable next to the starlette>=1.0.1 floor.
+constraint-dependencies = ["prometheus-fastapi-instrumentator<9"]
 
 [build-system]
 requires = ["setuptools>=61.0"]

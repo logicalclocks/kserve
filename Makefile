@@ -9,6 +9,9 @@ include kserve-images.env
 
 # Base Image URL
 BASE_IMG ?= python:3.11-slim-bookworm
+# sklearnserver moved to trixie for HWORKS-3139 (bookworm carries no-fix CVEs);
+# keep it separate until the sibling images move too.
+SKLEARN_BASE_IMG ?= python:3.11-slim-trixie
 PMML_BASE_IMG ?= eclipse-temurin:21-jdk-noble
 
 CRD_OPTIONS ?= "crd:maxDescLen=0"
@@ -505,7 +508,7 @@ docker-push-router:
 	${ENGINE} push ${KO_DOCKER_REPO}/${ROUTER_IMG}
 
 docker-build-sklearn:
-	cd python && ${ENGINE} buildx build ${ARCH} --build-arg BASE_IMAGE=${BASE_IMG} -t ${KO_DOCKER_REPO}/${SKLEARN_IMG} -f sklearn.Dockerfile .
+	cd python && ${ENGINE} buildx build ${ARCH} --build-arg BASE_IMAGE=${SKLEARN_BASE_IMG} -t ${KO_DOCKER_REPO}/${SKLEARN_IMG} -f sklearn.Dockerfile .
 
 docker-push-sklearn: docker-build-sklearn
 	${ENGINE} push ${KO_DOCKER_REPO}/${SKLEARN_IMG}
