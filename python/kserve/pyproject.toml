@@ -9,7 +9,10 @@ requires-python = ">=3.10,<3.14"
 dependencies = [
     "uvicorn[standard]<1.0.0,>=0.30.6",
     "watchfiles<2.0.0,>=1.0.4",
-    "fastapi>=0.115.3,<1.0.0",
+    # <0.137: fastapi 0.137.0 adds _IncludedRouter entries to the router table,
+    # which crashes timing_asgi's StarletteScopeToName on every request
+    # (AttributeError: no attribute 'endpoint'). 0.136.x is what upstream locks.
+    "fastapi>=0.115.3,<0.137",
     "starlette>=1.3.1", # CVE-2026-48710, CVE-2026-54283
     "cloudevents<2.0.0,>=1.6.2",
     "six<2.0.0,>=1.16.0",
@@ -34,13 +37,14 @@ dependencies = [
     # [tool.uv] override-dependencies) so consumers installing kserve from PyPI
     # also inherit the CVE fixes; override-dependencies applies to this
     # workspace's resolver only and is stripped from the published wheel.
-    "aiohttp>=3.13.4", # CVE-2026-34520
+    "aiohttp>=3.14.3", # CVE-2026-34520
     "h11>=0.16.0", # CVE-2025-43859
     "cryptography>=50.0.0", # GHSA-537c-gmf6-5ccf, PYSEC-2026-36, GHSA-g6cj-pr64-35w5
     "python-multipart>=0.0.27", # CVE-2026-42561
     "pyjwt>=2.13.0", # CVE-2026-48526
     "pyasn1>=0.6.4", # CVE-2026-30922, CVE-2026-59885
     "pillow>=12.3.0", # CVE-2026-40192
+    "idna>=3.15", # CVE-2026-45409
 ]
 name = "kserve"
 version = "0.21.0"
@@ -112,13 +116,14 @@ index-strategy = "unsafe-best-match"
 # Keeping these here too unconditionally overrides versions even if a sub-dependency strictly requires an older version.
 override-dependencies = [
     "urllib3>=2.7.0", # CVE-2026-21441
-    "aiohttp>=3.13.4", # CVE-2026-34520
+    "aiohttp>=3.14.3", # CVE-2026-34520
     "h11>=0.16.0", # CVE-2025-43859
     "cryptography>=50.0.0", # GHSA-537c-gmf6-5ccf, PYSEC-2026-36, GHSA-g6cj-pr64-35w5
     "python-multipart>=0.0.27", # CVE-2026-42561
     "pyjwt>=2.13.0", # CVE-2026-48526
     "pyasn1>=0.6.4", # CVE-2026-30922, CVE-2026-59885
     "pillow>=12.3.0", # CVE-2026-40192
+    "idna>=3.15", # CVE-2026-45409
 ]
 
 [build-system]
