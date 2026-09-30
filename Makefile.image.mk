@@ -40,7 +40,7 @@ docker-push-router:
 	${ENGINE} push ${KO_DOCKER_REPO}/${ROUTER_IMG}:${TAG}
 
 docker-build-sklearn:
-	cd python && ${ENGINE} buildx build ${ARCH} --build-arg BASE_IMAGE=${BASE_IMG} -t ${KO_DOCKER_REPO}/${SKLEARN_IMG}:${TAG} -f sklearn.Dockerfile .
+	cd python && ${ENGINE} buildx build ${ARCH} --build-arg BASE_IMAGE=${SKLEARN_BASE_IMG} -t ${KO_DOCKER_REPO}/${SKLEARN_IMG}:${TAG} -f sklearn.Dockerfile .
 
 docker-push-sklearn: docker-build-sklearn
 	${ENGINE} push ${KO_DOCKER_REPO}/${SKLEARN_IMG}:${TAG}

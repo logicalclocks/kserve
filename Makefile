@@ -11,6 +11,9 @@ CURRENT_YEAR := $(shell date +%Y)
 
 # Base Image URL
 BASE_IMG ?= python:3.11-slim-bookworm
+# sklearnserver moved to trixie for HWORKS-3139 (bookworm carries no-fix CVEs);
+# keep it separate until the sibling images move too.
+SKLEARN_BASE_IMG ?= python:3.11-slim-trixie
 PMML_BASE_IMG ?= eclipse-temurin:21-jdk-noble
 
 CRD_OPTIONS ?= "crd:maxDescLen=0"
