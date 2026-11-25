@@ -8,7 +8,8 @@ requires-python = "<3.14,>=3.10"
 dependencies = [
     # GHSA-6mq8-rvhq-8wgg, CVE-2025-69223 aiohttp HTTP parser auto_decompress zip bomb DoS
     "aiohttp<4.0.0,>=3.13.3",
-    "certifi>=2024.7.4",
+    # GHSA-6q48-6c7w-9gw2
+    "certifi>=2026.10.19",
     "requests<3.0.0,>=2.32.2",
     "google-cloud-storage<3.0.0,>=2.14.0",
     "azure-storage-blob<13.0.0,>=12.20.0",
@@ -25,8 +26,9 @@ dependencies = [
     "oras<1.0.0,>=0.2.42",
     "cryptography>=48.0.1", # GHSA-537c-gmf6-5ccf, PYSEC-2026-36
     # CVE-2026-32597 PyJWT accepts unknown `crit` header extensions (RFC 7515 §4.1.11 MUST violation)
+    # CVE-2026-102268
     # Pinning because it is a transitive dependency.
-    "pyjwt>=2.12.0",
+    "pyjwt>=2.14.0",
     # CVE-2026-30922 pyasn1 Vulnerable to Denial of Service via Unbounded Recursion
     # CVE-2026-59885 pyasn1 Quadratic complexity in OID processing allows DoS
     # Pinning because it is a transitive dependency.

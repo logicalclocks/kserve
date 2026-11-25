@@ -41,10 +41,13 @@ dependencies = [
     "h11>=0.16.0", # CVE-2025-43859
     "cryptography>=50.0.0", # GHSA-537c-gmf6-5ccf, PYSEC-2026-36, GHSA-g6cj-pr64-35w5
     "python-multipart>=0.0.27", # CVE-2026-42561
-    "pyjwt>=2.13.0", # CVE-2026-48526
+    "pyjwt>=2.14.0", # CVE-2026-48526, CVE-2026-102268
     "pyasn1>=0.6.4", # CVE-2026-30922, CVE-2026-59885
     "pillow>=12.3.0", # CVE-2026-40192
+    "pillow>=13.0.0; python_version >= '3.11'", # CVE-2026-96639; pillow 13 needs Python 3.11
     "idna>=3.15", # CVE-2026-45409
+    "anyio>=4.14.2", # CVE-2026-63374
+    "certifi>=2026.10.19", # GHSA-6q48-6c7w-9gw2
 ]
 name = "kserve"
 version = "0.21.0"
@@ -120,10 +123,13 @@ override-dependencies = [
     "h11>=0.16.0", # CVE-2025-43859
     "cryptography>=50.0.0", # GHSA-537c-gmf6-5ccf, PYSEC-2026-36, GHSA-g6cj-pr64-35w5
     "python-multipart>=0.0.27", # CVE-2026-42561
-    "pyjwt>=2.13.0", # CVE-2026-48526
+    "pyjwt>=2.14.0", # CVE-2026-48526, CVE-2026-102268
     "pyasn1>=0.6.4", # CVE-2026-30922, CVE-2026-59885
     "pillow>=12.3.0", # CVE-2026-40192
+    "pillow>=13.0.0; python_version >= '3.11'", # CVE-2026-96639; pillow 13 needs Python 3.11
     "idna>=3.15", # CVE-2026-45409
+    "anyio>=4.14.2", # CVE-2026-63374
+    "certifi>=2026.10.19", # GHSA-6q48-6c7w-9gw2
 ]
 
 [build-system]
